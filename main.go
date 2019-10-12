@@ -203,7 +203,10 @@ func initMetricCollector() {
 		},
 		append(
 			[]string{
-				"resourceType",
+				"resourceID",
+				"subscriptionID",
+				"resourceGroup",
+				"provider",
 			},
 		),
 	)

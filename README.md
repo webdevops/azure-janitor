@@ -49,6 +49,6 @@ Metrics
 
 | Metric                                         | Type         | Description                                                                           |
 |------------------------------------------------|--------------|---------------------------------------------------------------------------------------|
-| `azurejanitor_resources_ttl`                   | Gauge        | Number of found resources with TTL set (by resource type)                             |
+| `azurejanitor_resources_ttl`                   | Gauge        | List of Azure resources and resourcegroups with labels and expiry timestamp as value  |
 | `azurejanitor_resources_deleted`               | Counter      | Number of deleted resources (by resource type)                                        |
 | `azurejanitor_errors`                          | Counter      | Number of failed deleted resources (by resource type)                                 |

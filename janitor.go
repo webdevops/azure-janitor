@@ -9,6 +9,7 @@ import (
 	"github.com/google/logger"
 	"github.com/prometheus/client_golang/prometheus"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -38,27 +39,61 @@ func startAzureJanitor() {
 	go func() {
 		for {
 			logger.Infof("Starting run")
-			Prometheus.MetricTtlResources.Reset()
+			var wgMain sync.WaitGroup
+			var wgMetrics sync.WaitGroup
 
+			callbackTtlMetrics := make(chan MetricCollectorList)
+
+			// subscription processing
 			for _, subscription := range AzureSubscriptions {
+				wgMain.Add(1)
+				go func(subscription subscriptions.Subscription) {
+					defer wgMain.Done()
 
-				if !opts.JanitorDisableResourceGroups {
-					janitorCleanupResourceGroups(ctx, subscription, opts.janitorFilterResourceGroups)
-				}
+					if !opts.JanitorDisableResourceGroups {
+						janitorCleanupResourceGroups(ctx, subscription, opts.janitorFilterResourceGroups, callbackTtlMetrics)
+					}
 
-				if !opts.JanitorDisableResources {
-					janitorCleanupResources(ctx, subscription, opts.janitorFilterResources)
-				}
+					if !opts.JanitorDisableResources {
+						janitorCleanupResources(ctx, subscription, opts.janitorFilterResources, callbackTtlMetrics)
+					}
+				}(subscription)
 			}
+
+			// channel collecting gofunc
+			wgMetrics.Add(1)
+			go func() {
+				defer wgMetrics.Done()
+
+				// store metriclists from channel
+				ttlMetricListList := []MetricCollectorList{}
+				for ttlMetrics := range callbackTtlMetrics {
+					ttlMetricListList = append(ttlMetricListList, ttlMetrics)
+				}
+
+				// after channel is closed: reset metric and set them to the new state
+				Prometheus.MetricTtlResources.Reset()
+				for _, ttlMetrics := range ttlMetricListList {
+					ttlMetrics.GaugeSet(Prometheus.MetricTtlResources)
+				}
+			}()
+
+			// wait for subscription main func, then close channel and wait for metrics
+			wgMain.Wait()
+			close(callbackTtlMetrics)
+			wgMetrics.Wait()
+
 			logger.Infof("Finished run, waiting %s", opts.JanitorInterval.String())
 			time.Sleep(opts.JanitorInterval)
 		}
 	}()
 }
 
-func janitorCleanupResources(ctx context.Context, subscription subscriptions.Subscription, filter string) {
+func janitorCleanupResources(ctx context.Context, subscription subscriptions.Subscription, filter string, ttlMetricsChan chan<- MetricCollectorList) {
 	client := resources.NewClient(*subscription.SubscriptionID)
 	client.Authorizer = AzureAuthorizer
+
+	resourceTtl := MetricCollectorList{}
 
 	resourceResult, err := client.ListComplete(ctx, filter, "", nil)
 
@@ -70,7 +105,18 @@ func janitorCleanupResources(ctx context.Context, subscription subscriptions.Sub
 		resourceType := *resource.Type
 
 		if resource.Tags != nil {
-			if janitorCheckAzureResourceExpiry(resourceType, *resource.ID, resource.Tags) {
+			resourceExpiryTime, resourceExpired := janitorCheckAzureResourceExpiry(resourceType, *resource.ID, resource.Tags)
+
+			if resourceExpiryTime != nil {
+				resourceTtl.AddTime(prometheus.Labels{
+					"subscriptionID": *subscription.SubscriptionID,
+					"resourceID": *resource.ID,
+					"resourceGroup": extractResourceGroupFromAzureId(*resource.ID),
+					"provider": extractProviderFromAzureId(*resource.ID),
+				}, *resourceExpiryTime)
+			}
+
+			if resourceExpired {
 				logger.Infof("%s: expired, trying to delete", *resource.ID)
 				if _, err := client.DeleteByID(ctx, *resource.ID); err == nil {
 					// successfully deleted
@@ -90,11 +136,15 @@ func janitorCleanupResources(ctx context.Context, subscription subscriptions.Sub
 			}
 		}
 	}
+
+	ttlMetricsChan <- resourceTtl
 }
 
-func janitorCleanupResourceGroups(ctx context.Context, subscription subscriptions.Subscription, filter string) {
+func janitorCleanupResourceGroups(ctx context.Context, subscription subscriptions.Subscription, filter string, ttlMetricsChan chan<- MetricCollectorList) {
 	client := resources.NewGroupsClient(*subscription.SubscriptionID)
 	client.Authorizer = AzureAuthorizer
+
+	resourceTtl := MetricCollectorList{}
 
 	resourceGroupResult, err := client.ListComplete(ctx, filter, nil)
 	if err != nil {
@@ -106,7 +156,18 @@ func janitorCleanupResourceGroups(ctx context.Context, subscription subscription
 		resourceType := "Microsoft.Resources/resourceGroups"
 
 		if resourceGroup.Tags != nil {
-			if janitorCheckAzureResourceExpiry(resourceType, *resourceGroup.ID, resourceGroup.Tags) {
+			resourceExpiryTime, resourceExpired := janitorCheckAzureResourceExpiry(resourceType, *resourceGroup.ID, resourceGroup.Tags)
+
+			if resourceExpiryTime != nil {
+				resourceTtl.AddTime(prometheus.Labels{
+					"subscriptionID": *subscription.SubscriptionID,
+					"resourceID": *resourceGroup.ID,
+					"resourceGroup": *resourceGroup.Name,
+					"provider": resourceType,
+				}, *resourceExpiryTime)
+			}
+
+			if resourceExpired {
 				logger.Infof("%s: expired, trying to delete", *resourceGroup.ID)
 				if _, err := client.Delete(ctx, *resourceGroup.Name); err == nil {
 					// successfully deleted
@@ -126,9 +187,11 @@ func janitorCleanupResourceGroups(ctx context.Context, subscription subscription
 			}
 		}
 	}
+
+	ttlMetricsChan <- resourceTtl
 }
 
-func janitorCheckAzureResourceExpiry(resourceType, resourceId string, resourceTags map[string]*string) (resourceExpired bool) {
+func janitorCheckAzureResourceExpiry(resourceType, resourceId string, resourceTags map[string]*string) (resourceExpireTime *time.Time, resourceExpired bool) {
 	ttlValue := janitorAzureResourceGetTtlTag(resourceTags)
 
 	if ttlValue != nil {
@@ -136,11 +199,7 @@ func janitorCheckAzureResourceExpiry(resourceType, resourceId string, resourceTa
 			logger.Infof("%s: checking ttl", resourceId)
 		}
 
-		Prometheus.MetricTtlResources.With(prometheus.Labels{
-			"resourceType": resourceType,
-		}).Inc()
-
-		tagValueExpired, err := janitorCheckExpiryDate(*ttlValue)
+		tagValueParsed, tagValueExpired, err := janitorCheckExpiryDate(*ttlValue)
 
 		if err == nil {
 			if tagValueExpired {
@@ -154,6 +213,8 @@ func janitorCheckAzureResourceExpiry(resourceType, resourceId string, resourceTa
 					logger.Infof("%s: NOT expired", resourceId)
 				}
 			}
+
+			resourceExpireTime = tagValueParsed
 		} else {
 			logger.Errorf("%s: ERROR %s", resourceId, err)
 		}
@@ -172,8 +233,7 @@ func janitorAzureResourceGetTtlTag(tags map[string]*string) (ttlValue *string) {
 	return
 }
 
-func janitorCheckExpiryDate(value string) (expired bool, err error) {
-	var parsedTime *time.Time
+func janitorCheckExpiryDate(value string) (parsedTime *time.Time, expired bool, err error) {
 	expired = false
 
 	// sanity checks
