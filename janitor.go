@@ -116,7 +116,7 @@ func janitorCleanupResources(ctx context.Context, subscription subscriptions.Sub
 				}, *resourceExpiryTime)
 			}
 
-			if resourceExpired {
+			if !opts.DryRun && resourceExpired {
 				logger.Infof("%s: expired, trying to delete", *resource.ID)
 				if _, err := client.DeleteByID(ctx, *resource.ID); err == nil {
 					// successfully deleted
@@ -167,7 +167,7 @@ func janitorCleanupResourceGroups(ctx context.Context, subscription subscription
 				}, *resourceExpiryTime)
 			}
 
-			if resourceExpired {
+			if !opts.DryRun && resourceExpired {
 				logger.Infof("%s: expired, trying to delete", *resourceGroup.ID)
 				if _, err := client.Delete(ctx, *resourceGroup.Name); err == nil {
 					// successfully deleted
