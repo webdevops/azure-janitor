@@ -110,9 +110,9 @@ func janitorCleanupResources(ctx context.Context, subscription subscriptions.Sub
 			if resourceExpiryTime != nil {
 				resourceTtl.AddTime(prometheus.Labels{
 					"subscriptionID": *subscription.SubscriptionID,
-					"resourceID": *resource.ID,
-					"resourceGroup": extractResourceGroupFromAzureId(*resource.ID),
-					"provider": extractProviderFromAzureId(*resource.ID),
+					"resourceID":     *resource.ID,
+					"resourceGroup":  extractResourceGroupFromAzureId(*resource.ID),
+					"provider":       extractProviderFromAzureId(*resource.ID),
 				}, *resourceExpiryTime)
 			}
 
@@ -161,9 +161,9 @@ func janitorCleanupResourceGroups(ctx context.Context, subscription subscription
 			if resourceExpiryTime != nil {
 				resourceTtl.AddTime(prometheus.Labels{
 					"subscriptionID": *subscription.SubscriptionID,
-					"resourceID": *resourceGroup.ID,
-					"resourceGroup": *resourceGroup.Name,
-					"provider": resourceType,
+					"resourceID":     *resourceGroup.ID,
+					"resourceGroup":  *resourceGroup.Name,
+					"provider":       resourceType,
 				}, *resourceExpiryTime)
 			}
 
