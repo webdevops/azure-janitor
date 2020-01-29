@@ -19,6 +19,7 @@ Normally no configuration is needed but can be customized using environment vari
 | `SERVER_BIND`                     | `:8080`                     | IP/Port binding for metrics and healthcheck                       |
 | `JANITOR_INTERVAL`                | `1h`                        | How often Azure Janitor should cleanup the subscriptions (time.Duration) |
 | `JANITOR_TAG`                     | `ttl`                       | Resource tag name for ttl value (non deleting mode)               |
+| `JANITOR_RESOURCE_APIVERSION`     | `2019-03-01`                | API version for Azure Resource deletion                           |
 | `JANITOR_DISABLE_RESOURCEGROUPS`  | `false`                     | Enable/Disable Azure ResourceGroup clearing                       |
 | `JANITOR_DISABLE_RESOURCES`       | `false`                     | Enable/Disable Azure Resource clearing                            |
 | `JANITOR_DISABLE_DEPLOYMENTS`     | `false`                     | Enable/Disable Azure Deployment clearing                          |
@@ -52,6 +53,7 @@ Metrics
 
 | Metric                                         | Type         | Description                                                                           |
 |------------------------------------------------|--------------|---------------------------------------------------------------------------------------|
+| `azurejanitor_duration`                        | Gauge        | Duration of cleanup run in seconds                                                    |
 | `azurejanitor_resources_ttl`                   | Gauge        | List of Azure resources and resourcegroups with labels and expiry timestamp as value  |
 | `azurejanitor_resources_deleted`               | Counter      | Number of deleted resources (by resource type)                                        |
 | `azurejanitor_errors`                          | Counter      | Number of failed deleted resources (by resource type)                                 |

@@ -54,6 +54,8 @@ var opts struct {
 	JanitorInterval time.Duration `long:"janitor.interval" env:"JANITOR_INTERVAL"  description:"Janitor interval (time.duration)"  default:"1h"`
 	JanitorTag      string        `long:"janitor.tag"      env:"JANITOR_TAG"  description:"Janitor azure tag (string)"  default:"ttl"`
 
+	JanitorResourceApiVersion string `long:"janitor.resource.apiversion"      env:"JANITOR_RESOURCE_APIVERSION"  description:"Janitor Azure Resource API version (string)"  default:"2019-03-01"`
+
 	JanitorDeploymentsTtl      time.Duration        `long:"janitor.deployment.ttl"      env:"JANITOR_DEPLOYMENT_TTL"  description:"Janitor deploument ttl (time.duration)"  default:"8760h"`
 	JanitorDeploymentsLimit    int64                `long:"janitor.deployment.limit"      env:"JANITOR_DEPLOYMENT_LIMIT"  description:"Janitor deploument limit count (int)"  default:"700"`
 
