@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/resources/mgmt/subscriptions"
 	"github.com/google/logger"
+	"github.com/prometheus/client_golang/prometheus"
 	"strings"
 	"sync"
 	"time"
@@ -36,6 +37,7 @@ func startAzureJanitor() {
 
 	go func() {
 		for {
+			startTime := time.Now()
 			logger.Infof("Starting run")
 			var wgMain sync.WaitGroup
 			var wgMetrics sync.WaitGroup
@@ -85,7 +87,10 @@ func startAzureJanitor() {
 			close(callbackTtlMetrics)
 			wgMetrics.Wait()
 
-			logger.Infof("Finished run, waiting %s", opts.JanitorInterval.String())
+			duration := time.Now().Sub(startTime)
+			Prometheus.MetricDuration.With(prometheus.Labels{}).Set(duration.Seconds())
+
+			logger.Infof("Finished run in %s, waiting %s", duration.String(), opts.JanitorInterval.String())
 			time.Sleep(opts.JanitorInterval)
 		}
 	}()

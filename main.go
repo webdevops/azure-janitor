@@ -32,6 +32,7 @@ var (
 	AzureSubscriptions []subscriptions.Subscription
 
 	Prometheus struct {
+		MetricDuration        *prometheus.GaugeVec
 		MetricTtlResources    *prometheus.GaugeVec
 		MetricDeletedResource *prometheus.CounterVec
 		MetricErrors          *prometheus.CounterVec
@@ -202,6 +203,14 @@ func initAzureConnection() {
 
 func initMetricCollector() {
 
+	Prometheus.MetricDuration = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "azurejanitor_duration",
+			Help: "AzureJanitor cleanup duration",
+		},
+		[]string{},
+	)
+
 	Prometheus.MetricTtlResources = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "azurejanitor_resources_ttl",
@@ -240,6 +249,7 @@ func initMetricCollector() {
 		),
 	)
 
+	prometheus.MustRegister(Prometheus.MetricDuration)
 	prometheus.MustRegister(Prometheus.MetricTtlResources)
 	prometheus.MustRegister(Prometheus.MetricDeletedResource)
 	prometheus.MustRegister(Prometheus.MetricErrors)
