@@ -72,7 +72,7 @@ func janitorCleanupResourceGroupDeployments(ctx context.Context, subscription su
 			}
 		}
 
-		logger.Infof("%s: found %v deployments, %v existing", *resourceGroup.ID, deploymentCounter, deploymentFinalCounter)
+		logger.Infof("%s: found %v deployments, %v still existing, %v deleted", *resourceGroup.ID, deploymentCounter, deploymentFinalCounter, deploymentCounter-deploymentFinalCounter)
 	}
 
 	ttlMetricsChan <- resourceTtl
