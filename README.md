@@ -5,7 +5,7 @@ Azure Janitor
 [![Docker](https://img.shields.io/badge/docker-webdevops%2Fazure--janitor-blue.svg?longCache=true&style=flat&logo=docker)](https://hub.docker.com/r/webdevops/azure-janitor/)
 [![Docker Build Status](https://img.shields.io/docker/build/webdevops/azure-janitor.svg)](https://hub.docker.com/r/webdevops/azure-janitor/)
 
-Janitor for Azure ResourceGroups and Resources based on ttl tag.
+Janitor for Azure ResourceGroups and Resources based on ttl tag and Deployments based on TTL and limit.
 
 Configuration
 -------------
@@ -19,10 +19,13 @@ Normally no configuration is needed but can be customized using environment vari
 | `SERVER_BIND`                     | `:8080`                     | IP/Port binding for metrics and healthcheck                       |
 | `JANITOR_INTERVAL`                | `1h`                        | How often Azure Janitor should cleanup the subscriptions (time.Duration) |
 | `JANITOR_TAG`                     | `ttl`                       | Resource tag name for ttl value (non deleting mode)               |
-| `JANITOR_DISABLE_RESOURCEGROUPS`  | `true`                      | Enable/Disable Azure ResourceGroup clearing                       |
-| `JANITOR_DISABLE_RESOURCES`       | `true`                      | Enable/Disable Azure Resource clearing                            |
+| `JANITOR_DISABLE_RESOURCEGROUPS`  | `false`                     | Enable/Disable Azure ResourceGroup clearing                       |
+| `JANITOR_DISABLE_RESOURCES`       | `false`                     | Enable/Disable Azure Resource clearing                            |
+| `JANITOR_DISABLE_DEPLOYMENTS`     | `false`                     | Enable/Disable Azure Deployment clearing                          |
 | `JANITOR_FILTER_RESOURCES`        | `empty`                     | Additional Azure REST API $filter for Azure ResourceGroups        |
 | `JANITOR_FILTER_RESOURCEGROUPS`   | `empty`                     | Additional Azure REST API $filter for Azure Resources             |
+| `JANITOR_DEPLOYMENT_TTL`          | `8760h`                     | TTL (Expiry) for Azure ResourceGroup Deployments                  |
+| `JANITOR_DEPLOYMENT_LIMIT`        | `700`                       | Limit (count) of Azure ResourceGroup Deployments per ResourceGroup (Azure limit: 800) |
 
 for Azure API authentication (using ENV vars) see https://github.com/Azure/azure-sdk-for-go#authentication
 
