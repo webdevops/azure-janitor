@@ -59,7 +59,6 @@ func janitorCleanupResources(ctx context.Context, subscription subscriptions.Sub
 	ttlMetricsChan <- resourceTtl
 }
 
-
 func janitorAzureResourceGetTtlTag(tags map[string]*string) (ttlValue *string) {
 	for tagName, tagValue := range tags {
 		if tagName == opts.JanitorTag && tagValue != nil && *tagValue != "" {

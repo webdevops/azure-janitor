@@ -57,12 +57,12 @@ var opts struct {
 
 	JanitorResourceApiVersion string `long:"janitor.resource.apiversion"      env:"JANITOR_RESOURCE_APIVERSION"  description:"Janitor Azure Resource API version (string)"  default:"2019-03-01"`
 
-	JanitorDeploymentsTtl      time.Duration        `long:"janitor.deployment.ttl"      env:"JANITOR_DEPLOYMENT_TTL"  description:"Janitor deploument ttl (time.duration)"  default:"8760h"`
-	JanitorDeploymentsLimit    int64                `long:"janitor.deployment.limit"      env:"JANITOR_DEPLOYMENT_LIMIT"  description:"Janitor deploument limit count (int)"  default:"700"`
+	JanitorDeploymentsTtl   time.Duration `long:"janitor.deployment.ttl"      env:"JANITOR_DEPLOYMENT_TTL"  description:"Janitor deploument ttl (time.duration)"  default:"8760h"`
+	JanitorDeploymentsLimit int64         `long:"janitor.deployment.limit"      env:"JANITOR_DEPLOYMENT_LIMIT"  description:"Janitor deploument limit count (int)"  default:"700"`
 
 	JanitorDisableResourceGroups bool `long:"janitor.disable.resourcegroups" env:"JANITOR_DISABLE_RESOURCEGROUPS"  description:"Disable Azure ResourceGroups cleanup"`
 	JanitorDisableResources      bool `long:"janitor.disable.resources"      env:"JANITOR_DISABLE_RESOURCES"  description:"Disable Azure Resources cleanup"`
-	JanitorDisableDeployments bool `long:"janitor.disable.deployments"      env:"JANITOR_DISABLE_DEPLOYMENTS"  description:"Disable Azure Deployments cleanup"`
+	JanitorDisableDeployments    bool `long:"janitor.disable.deployments"      env:"JANITOR_DISABLE_DEPLOYMENTS"  description:"Disable Azure Deployments cleanup"`
 
 	JanitorAdditionalFilterResourceGroups *string `long:"janitor.filter.resourcegroups" env:"JANITOR_FILTER_RESOURCEGROUPS"  description:"Additional $filter for Azure REST API for ResourceGroups"`
 	JanitorAdditionalFilterResources      *string `long:"janitor.filter.resources"      env:"JANITOR_FILTER_RESOURCES"  description:"Additional $filter for Azure REST API for Resources"`

@@ -77,4 +77,3 @@ func janitorCleanupResourceGroupDeployments(ctx context.Context, subscription su
 
 	ttlMetricsChan <- resourceTtl
 }
-
