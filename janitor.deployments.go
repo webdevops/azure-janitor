@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-func janitorCleanupResourceGroupDeployments(ctx context.Context, subscription subscriptions.Subscription, filter string, ttlMetricsChan chan<- MetricCollectorList) {
+func janitorCleanupResourceGroupDeployments(ctx context.Context, subscription subscriptions.Subscription, ttlMetricsChan chan<- MetricCollectorList) {
 	var deploymentCounter, deploymentFinalCounter int64
 
 	client := resources.NewGroupsClient(*subscription.SubscriptionID)
@@ -22,7 +22,7 @@ func janitorCleanupResourceGroupDeployments(ctx context.Context, subscription su
 
 	resourceType := "Microsoft.Resources/deployments"
 
-	resourceGroupResult, err := client.ListComplete(ctx, filter, nil)
+	resourceGroupResult, err := client.ListComplete(ctx, "", nil)
 	if err != nil {
 		panic(err)
 	}
