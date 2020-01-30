@@ -59,7 +59,7 @@ func startAzureJanitor() {
 					}
 
 					if !opts.JanitorDisableDeployments {
-						janitorCleanupResourceGroupDeployments(ctx, subscription, opts.janitorFilterResources, callbackTtlMetrics)
+						janitorCleanupResourceGroupDeployments(ctx, subscription, callbackTtlMetrics)
 					}
 				}(subscription)
 			}
