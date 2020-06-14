@@ -24,7 +24,7 @@ func janitorCleanupResourceGroups(ctx context.Context, subscription subscription
 		resourceType := "Microsoft.Resources/resourceGroups"
 
 		if resourceGroup.Tags != nil {
-			resourceExpiryTime, resourceExpired := janitorCheckAzureResourceExpiry(resourceType, *resourceGroup.ID, resourceGroup.Tags)
+			resourceExpiryTime, resourceExpired, resourceTagUpdateNeeded := janitorCheckAzureResourceExpiry(resourceType, *resourceGroup.ID, &resourceGroup.Tags)
 
 			if resourceExpiryTime != nil {
 				resourceTtl.AddTime(prometheus.Labels{
@@ -33,6 +33,25 @@ func janitorCleanupResourceGroups(ctx context.Context, subscription subscription
 					"resourceGroup":  *resourceGroup.Name,
 					"provider":       resourceType,
 				}, *resourceExpiryTime)
+			}
+
+			if !opts.DryRun && resourceTagUpdateNeeded {
+				logger.Infof("%s: tag update needed, updating resource", *resourceGroup.ID)
+				resourceGroupOpts := resources.GroupPatchable{
+					Tags: resourceGroup.Tags,
+				}
+
+				if _, err := client.Update(ctx, *resourceGroup.Name, resourceGroupOpts); err == nil {
+					// successfully deleted
+					logger.Infof("%s: successfully updated", *resourceGroup.ID)
+				} else {
+					// failed delete
+					logger.Errorf("%s: ERROR %s", *resourceGroup.ID, err)
+
+					Prometheus.MetricErrors.With(prometheus.Labels{
+						"resourceType": resourceType,
+					}).Inc()
+				}
 			}
 
 			if !opts.DryRun && resourceExpired {

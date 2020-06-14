@@ -24,7 +24,7 @@ func janitorCleanupResources(ctx context.Context, subscription subscriptions.Sub
 		resourceType := *resource.Type
 
 		if resource.Tags != nil {
-			resourceExpiryTime, resourceExpired := janitorCheckAzureResourceExpiry(resourceType, *resource.ID, resource.Tags)
+			resourceExpiryTime, resourceExpired, resourceTagUpdateNeeded := janitorCheckAzureResourceExpiry(resourceType, *resource.ID, &resource.Tags)
 
 			if resourceExpiryTime != nil {
 				resourceTtl.AddTime(prometheus.Labels{
@@ -33,6 +33,25 @@ func janitorCleanupResources(ctx context.Context, subscription subscriptions.Sub
 					"resourceGroup":  extractResourceGroupFromAzureId(*resource.ID),
 					"provider":       extractProviderFromAzureId(*resource.ID),
 				}, *resourceExpiryTime)
+			}
+
+			if !opts.DryRun && resourceTagUpdateNeeded {
+				logger.Infof("%s: tag update needed, updating resource", *resource.ID)
+				resourceOpts := resources.GenericResource{
+					Tags: resource.Tags,
+				}
+
+				if _, err := client.UpdateByID(ctx, *resource.ID, opts.JanitorResourceApiVersion, resourceOpts); err == nil {
+					// successfully deleted
+					logger.Infof("%s: successfully updated", *resource.ID)
+				} else {
+					// failed delete
+					logger.Errorf("%s: ERROR %s", *resource.ID, err)
+
+					Prometheus.MetricErrors.With(prometheus.Labels{
+						"resourceType": resourceType,
+					}).Inc()
+				}
 			}
 
 			if !opts.DryRun && resourceExpired {
@@ -59,9 +78,10 @@ func janitorCleanupResources(ctx context.Context, subscription subscriptions.Sub
 	ttlMetricsChan <- resourceTtl
 }
 
-func janitorAzureResourceGetTtlTag(tags map[string]*string) (ttlValue *string) {
+func janitorAzureResourceGetTtlTag(tags map[string]*string) (ttlName, ttlValue *string) {
 	for tagName, tagValue := range tags {
 		if tagName == opts.JanitorTag && tagValue != nil && *tagValue != "" {
+			ttlName = &tagName
 			ttlValue = tagValue
 		}
 	}

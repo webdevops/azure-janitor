@@ -7,6 +7,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/resources/mgmt/subscriptions"
 	"github.com/google/logger"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/rickb777/date/period"
 	"strings"
 	"sync"
 	"time"
@@ -96,12 +97,20 @@ func startAzureJanitor() {
 	}()
 }
 
-func janitorCheckAzureResourceExpiry(resourceType, resourceId string, resourceTags map[string]*string) (resourceExpireTime *time.Time, resourceExpired bool) {
-	ttlValue := janitorAzureResourceGetTtlTag(resourceTags)
+func janitorCheckAzureResourceExpiry(resourceType, resourceId string, resourceTags *map[string]*string) (resourceExpireTime *time.Time, resourceExpired bool, resourceTagRewriteNeeded bool) {
+	tagName, ttlValue := janitorAzureResourceGetTtlTag(*resourceTags)
 
 	if ttlValue != nil {
 		if Verbose {
 			logger.Infof("%s: checking ttl", resourceId)
+		}
+
+		if val, err := janitorCheckExpiryDuration(*ttlValue); err == nil && val != nil {
+			logger.Infof("%s: found valid duration", resourceId)
+			resourceTagRewriteNeeded = true
+			ttlValue := val.Format(time.RFC3339)
+			(*resourceTags)[*tagName] = &ttlValue
+			return
 		}
 
 		tagValueParsed, tagValueExpired, err := janitorCheckExpiryDate(*ttlValue)
@@ -123,6 +132,23 @@ func janitorCheckAzureResourceExpiry(resourceType, resourceId string, resourceTa
 		} else {
 			logger.Errorf("%s: ERROR %s", resourceId, err)
 		}
+	}
+
+	return
+}
+
+func janitorCheckExpiryDuration(value string) (parsedTime *time.Time, err error) {
+
+	// sanity checks
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return
+	}
+
+	if val, err := period.Parse(value); err == nil {
+		// parse duration
+		calcTime := time.Now().Add(val.DurationApprox())
+		parsedTime = &calcTime
 	}
 
 	return
