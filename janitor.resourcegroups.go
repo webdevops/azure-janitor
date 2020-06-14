@@ -6,13 +6,15 @@ import (
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/resources/mgmt/subscriptions"
 	"github.com/google/logger"
 	"github.com/prometheus/client_golang/prometheus"
+	prometheusCommon "github.com/webdevops/go-prometheus-common"
 )
 
-func janitorCleanupResourceGroups(ctx context.Context, subscription subscriptions.Subscription, filter string, ttlMetricsChan chan<- MetricCollectorList) {
+
+func (j *Janitor) runResourceGroups(ctx context.Context, subscription subscriptions.Subscription, filter string, ttlMetricsChan chan<- *prometheusCommon.MetricList) {
 	client := resources.NewGroupsClient(*subscription.SubscriptionID)
 	client.Authorizer = AzureAuthorizer
 
-	resourceTtl := MetricCollectorList{}
+	resourceTtl := prometheusCommon.NewMetricsList()
 
 	resourceGroupResult, err := client.ListComplete(ctx, filter, nil)
 	if err != nil {
@@ -24,7 +26,7 @@ func janitorCleanupResourceGroups(ctx context.Context, subscription subscription
 		resourceType := "Microsoft.Resources/resourceGroups"
 
 		if resourceGroup.Tags != nil {
-			resourceExpiryTime, resourceExpired, resourceTagUpdateNeeded := janitorCheckAzureResourceExpiry(resourceType, *resourceGroup.ID, &resourceGroup.Tags)
+			resourceExpiryTime, resourceExpired, resourceTagUpdateNeeded := j.checkAzureResourceExpiry(resourceType, *resourceGroup.ID, &resourceGroup.Tags)
 
 			if resourceExpiryTime != nil {
 				resourceTtl.AddTime(prometheus.Labels{

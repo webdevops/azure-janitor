@@ -6,13 +6,14 @@ import (
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/resources/mgmt/subscriptions"
 	"github.com/google/logger"
 	"github.com/prometheus/client_golang/prometheus"
+	prometheusCommon "github.com/webdevops/go-prometheus-common"
 )
 
-func janitorCleanupResources(ctx context.Context, subscription subscriptions.Subscription, filter string, ttlMetricsChan chan<- MetricCollectorList) {
+func (j *Janitor) runResources(ctx context.Context, subscription subscriptions.Subscription, filter string, ttlMetricsChan chan<- *prometheusCommon.MetricList) {
 	client := resources.NewClient(*subscription.SubscriptionID)
 	client.Authorizer = AzureAuthorizer
 
-	resourceTtl := MetricCollectorList{}
+	resourceTtl := prometheusCommon.NewMetricsList()
 
 	resourceResult, err := client.ListComplete(ctx, filter, "", nil)
 
@@ -24,7 +25,7 @@ func janitorCleanupResources(ctx context.Context, subscription subscriptions.Sub
 		resourceType := *resource.Type
 
 		if resource.Tags != nil {
-			resourceExpiryTime, resourceExpired, resourceTagUpdateNeeded := janitorCheckAzureResourceExpiry(resourceType, *resource.ID, &resource.Tags)
+			resourceExpiryTime, resourceExpired, resourceTagUpdateNeeded := j.checkAzureResourceExpiry(resourceType, *resource.ID, &resource.Tags)
 
 			if resourceExpiryTime != nil {
 				resourceTtl.AddTime(prometheus.Labels{
@@ -76,15 +77,4 @@ func janitorCleanupResources(ctx context.Context, subscription subscriptions.Sub
 	}
 
 	ttlMetricsChan <- resourceTtl
-}
-
-func janitorAzureResourceGetTtlTag(tags map[string]*string) (ttlName, ttlValue *string) {
-	for tagName, tagValue := range tags {
-		if tagName == opts.JanitorTag && tagValue != nil && *tagValue != "" {
-			ttlName = &tagName
-			ttlValue = tagValue
-		}
-	}
-
-	return
 }

@@ -108,7 +108,8 @@ func main() {
 		Logger.Infof("  disabled Azure Resources cleanup")
 	}
 
-	startAzureJanitor()
+	j := Janitor{}
+	j.Run()
 
 	Logger.Infof("Starting http server on %s", opts.ServerBind)
 	startHttpServer()

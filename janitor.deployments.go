@@ -7,15 +7,16 @@ import (
 	"github.com/google/logger"
 	"github.com/prometheus/client_golang/prometheus"
 	"time"
+	prometheusCommon "github.com/webdevops/go-prometheus-common"
 )
 
-func janitorCleanupResourceGroupDeployments(ctx context.Context, subscription subscriptions.Subscription, ttlMetricsChan chan<- MetricCollectorList) {
+func (j *Janitor) runDeployments(ctx context.Context, subscription subscriptions.Subscription, ttlMetricsChan chan<- *prometheusCommon.MetricList) {
 	var deploymentCounter, deploymentFinalCounter int64
 
 	client := resources.NewGroupsClient(*subscription.SubscriptionID)
 	client.Authorizer = AzureAuthorizer
 
-	resourceTtl := MetricCollectorList{}
+	resourceTtl := prometheusCommon.NewMetricsList()
 
 	deploymentClient := resources.NewDeploymentsClient(*subscription.SubscriptionID)
 	deploymentClient.Authorizer = AzureAuthorizer

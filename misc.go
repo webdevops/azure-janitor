@@ -3,7 +3,6 @@ package main
 import (
 	"regexp"
 	"strings"
-	"time"
 )
 
 var (
@@ -25,8 +24,4 @@ func extractProviderFromAzureId(azureId string) (provider string) {
 	}
 
 	return
-}
-
-func timeToFloat64(v time.Time) float64 {
-	return float64(v.Unix())
 }

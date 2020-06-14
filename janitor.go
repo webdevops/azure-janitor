@@ -8,10 +8,16 @@ import (
 	"github.com/google/logger"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rickb777/date/period"
+	prometheusCommon "github.com/webdevops/go-prometheus-common"
 	"strings"
 	"sync"
 	"time"
 )
+
+type (
+	Janitor struct {}
+)
+
 
 var (
 	janitorTimeFormats = []string{
@@ -33,7 +39,7 @@ var (
 	}
 )
 
-func startAzureJanitor() {
+func (j *Janitor) Run() {
 	ctx := context.Background()
 
 	go func() {
@@ -43,7 +49,7 @@ func startAzureJanitor() {
 			var wgMain sync.WaitGroup
 			var wgMetrics sync.WaitGroup
 
-			callbackTtlMetrics := make(chan MetricCollectorList)
+			callbackTtlMetrics := make(chan *prometheusCommon.MetricList)
 
 			// subscription processing
 			for _, subscription := range AzureSubscriptions {
@@ -52,15 +58,15 @@ func startAzureJanitor() {
 					defer wgMain.Done()
 
 					if !opts.JanitorDisableResourceGroups {
-						janitorCleanupResourceGroups(ctx, subscription, opts.janitorFilterResourceGroups, callbackTtlMetrics)
+						j.runResourceGroups(ctx, subscription, opts.janitorFilterResourceGroups, callbackTtlMetrics)
 					}
 
 					if !opts.JanitorDisableResources {
-						janitorCleanupResources(ctx, subscription, opts.janitorFilterResources, callbackTtlMetrics)
+						j.runResources(ctx, subscription, opts.janitorFilterResources, callbackTtlMetrics)
 					}
 
 					if !opts.JanitorDisableDeployments {
-						janitorCleanupResourceGroupDeployments(ctx, subscription, callbackTtlMetrics)
+						j.runDeployments(ctx, subscription, callbackTtlMetrics)
 					}
 				}(subscription)
 			}
@@ -71,9 +77,11 @@ func startAzureJanitor() {
 				defer wgMetrics.Done()
 
 				// store metriclists from channel
-				ttlMetricListList := []MetricCollectorList{}
+				ttlMetricListList := []prometheusCommon.MetricList{}
 				for ttlMetrics := range callbackTtlMetrics {
-					ttlMetricListList = append(ttlMetricListList, ttlMetrics)
+					if ttlMetrics != nil {
+						ttlMetricListList = append(ttlMetricListList, *ttlMetrics)
+					}
 				}
 
 				// after channel is closed: reset metric and set them to the new state
@@ -97,15 +105,15 @@ func startAzureJanitor() {
 	}()
 }
 
-func janitorCheckAzureResourceExpiry(resourceType, resourceId string, resourceTags *map[string]*string) (resourceExpireTime *time.Time, resourceExpired bool, resourceTagRewriteNeeded bool) {
-	tagName, ttlValue := janitorAzureResourceGetTtlTag(*resourceTags)
+func (j *Janitor)  checkAzureResourceExpiry(resourceType, resourceId string, resourceTags *map[string]*string) (resourceExpireTime *time.Time, resourceExpired bool, resourceTagRewriteNeeded bool) {
+	tagName, ttlValue := j.getTtlTagFromAzureResoruce(*resourceTags)
 
 	if ttlValue != nil {
 		if Verbose {
 			logger.Infof("%s: checking ttl", resourceId)
 		}
 
-		if val, err := janitorCheckExpiryDuration(*ttlValue); err == nil && val != nil {
+		if val, err := j.checkExpiryDuration(*ttlValue); err == nil && val != nil {
 			logger.Infof("%s: found valid duration", resourceId)
 			resourceTagRewriteNeeded = true
 			ttlValue := val.Format(time.RFC3339)
@@ -113,7 +121,7 @@ func janitorCheckAzureResourceExpiry(resourceType, resourceId string, resourceTa
 			return
 		}
 
-		tagValueParsed, tagValueExpired, err := janitorCheckExpiryDate(*ttlValue)
+		tagValueParsed, tagValueExpired, err := j.checkExpiryDate(*ttlValue)
 
 		if err == nil {
 			if tagValueExpired {
@@ -137,7 +145,18 @@ func janitorCheckAzureResourceExpiry(resourceType, resourceId string, resourceTa
 	return
 }
 
-func janitorCheckExpiryDuration(value string) (parsedTime *time.Time, err error) {
+func (j *Janitor) getTtlTagFromAzureResoruce(tags map[string]*string) (ttlName, ttlValue *string) {
+	for tagName, tagValue := range tags {
+		if tagName == opts.JanitorTag && tagValue != nil && *tagValue != "" {
+			ttlName = &tagName
+			ttlValue = tagValue
+		}
+	}
+
+	return
+}
+
+func (j *Janitor) checkExpiryDuration(value string) (parsedTime *time.Time, err error) {
 
 	// sanity checks
 	value = strings.TrimSpace(value)
@@ -154,7 +173,7 @@ func janitorCheckExpiryDuration(value string) (parsedTime *time.Time, err error)
 	return
 }
 
-func janitorCheckExpiryDate(value string) (parsedTime *time.Time, expired bool, err error) {
+func (j *Janitor) checkExpiryDate(value string) (parsedTime *time.Time, expired bool, err error) {
 	expired = false
 
 	// sanity checks
