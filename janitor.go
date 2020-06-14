@@ -139,9 +139,8 @@ func janitorCheckExpiryDate(value string) (parsedTime *time.Time, expired bool, 
 
 	// parse time
 	for _, timeFormat := range janitorTimeFormats {
-		if val, err := time.Parse(timeFormat, value); err == nil && val.Unix() > 0 {
-			parsedTime = &val
-			err = nil
+		if parseVal, parseErr := time.Parse(timeFormat, value); parseErr == nil && parseVal.Unix() > 0 {
+			parsedTime = &parseVal
 			break
 		}
 	}

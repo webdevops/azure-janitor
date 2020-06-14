@@ -19,17 +19,19 @@ import (
 )
 
 const (
-	Author  = "webdevops.io"
-	Version = "0.3.2"
+	Author = "webdevops.io"
 )
 
 var (
 	argparser          *flags.Parser
-	args               []string
 	Verbose            bool
 	Logger             *DaemonLogger
 	AzureAuthorizer    autorest.Authorizer
 	AzureSubscriptions []subscriptions.Subscription
+
+	// Git version information
+	gitCommit = "<unknown>"
+	gitTag    = "<unknown>"
 
 	Prometheus struct {
 		MetricDuration        *prometheus.GaugeVec
@@ -82,7 +84,7 @@ func main() {
 	// set verbosity
 	Verbose = len(opts.Verbose) >= 1
 
-	Logger.Infof("Init Azure Janitor exporter v%s (written by %v)", Version, Author)
+	Logger.Infof("Init Azure Janitor exporter v%s (%s; by %v)", gitTag, gitCommit, Author)
 
 	Logger.Infof("Init Azure connection")
 	initAzureConnection()
