@@ -16,15 +16,15 @@ func (j *Janitor) runResources(ctx context.Context, subscription subscriptions.S
 	resourceTtl := prometheusCommon.NewMetricsList()
 
 	resourceResult, err := client.ListComplete(ctx, filter, "", nil)
-
 	if err != nil {
 		panic(err)
 	}
 
 	for _, resource := range *resourceResult.Response().Value {
 		resourceType := *resource.Type
+		resourceTypeApiVersion := j.getAzureApiVersionForSubscriptionResourceType(*subscription.SubscriptionID, resourceType)
 
-		if resource.Tags != nil {
+		if resourceTypeApiVersion != "" && resource.Tags != nil {
 			resourceExpiryTime, resourceExpired, resourceTagUpdateNeeded := j.checkAzureResourceExpiry(resourceType, *resource.ID, &resource.Tags)
 
 			if resourceExpiryTime != nil {
@@ -39,10 +39,11 @@ func (j *Janitor) runResources(ctx context.Context, subscription subscriptions.S
 			if !opts.DryRun && resourceTagUpdateNeeded {
 				logger.Infof("%s: tag update needed, updating resource", *resource.ID)
 				resourceOpts := resources.GenericResource{
+					Name: resource.Name,
 					Tags: resource.Tags,
 				}
 
-				if _, err := client.UpdateByID(ctx, *resource.ID, opts.JanitorResourceApiVersion, resourceOpts); err == nil {
+				if _, err := client.UpdateByID(ctx, *resource.ID, resourceTypeApiVersion, resourceOpts); err == nil {
 					// successfully deleted
 					logger.Infof("%s: successfully updated", *resource.ID)
 				} else {
@@ -57,7 +58,7 @@ func (j *Janitor) runResources(ctx context.Context, subscription subscriptions.S
 
 			if !opts.DryRun && resourceExpired {
 				logger.Infof("%s: expired, trying to delete", *resource.ID)
-				if _, err := client.DeleteByID(ctx, *resource.ID, opts.JanitorResourceApiVersion); err == nil {
+				if _, err := client.DeleteByID(ctx, *resource.ID, resourceTypeApiVersion); err == nil {
 					// successfully deleted
 					logger.Infof("%s: successfully deleted", *resource.ID)
 

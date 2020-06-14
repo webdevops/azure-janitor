@@ -35,7 +35,7 @@ Azure tag
 
 By default the Azure Janitor is using `ttl` as tag to trigger a cleanup if the resource is expired.
 
-Currently only absolute timestamps are supported, eg:
+Supported absolute timestamps
 
 - 2006-01-02 15:04:05 +07:00
 - 2006-01-02 15:04:05 MST
@@ -47,6 +47,20 @@ Currently only absolute timestamps are supported, eg:
 - Mon, 02 Jan 2006 15:04:05 -0700 (RFC1123Z)
 - 2006-01-02T15:04:05Z07:00 (RFC3339)
 - 2006-01-02T15:04:05.999999999Z07:00 (RFC3339Nano)
+
+
+Supported relative timestamps
+(tag will be updated with absolute timestamp as soon it's found)
+
+- [ISO8601 (durations)](https://en.wikipedia.org/wiki/ISO_8601#Durations)
+    - PT24H (24h)
+    - P1M (1 month)
+- [golang (extended) durations](https://github.com/karrick/tparse)
+    - 1h (1 hour)
+    - 1d (1 day)
+    - 1w (1 week)
+    - 1mo (1 month)
+    - 1y (1 year)
 
 Metrics
 -------

@@ -12,6 +12,7 @@ require (
 	github.com/golang/protobuf v1.4.2 // indirect
 	github.com/google/logger v1.1.0
 	github.com/jessevdk/go-flags v1.4.0
+	github.com/karrick/tparse/v2 v2.8.1
 	github.com/prometheus/client_golang v1.6.0
 	github.com/prometheus/common v0.10.0 // indirect
 	github.com/prometheus/procfs v0.1.3 // indirect
