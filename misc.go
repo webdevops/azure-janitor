@@ -2,7 +2,6 @@ package main
 
 import (
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -14,7 +13,7 @@ var (
 
 func extractResourceGroupFromAzureId(azureId string) (resourceGroup string) {
 	if subMatch := resourceGroupFromResourceIdRegExp.FindStringSubmatch(azureId); len(subMatch) >= 1 {
-		resourceGroup = subMatch[1]
+		resourceGroup = strings.ToLower(subMatch[1])
 	}
 
 	return
