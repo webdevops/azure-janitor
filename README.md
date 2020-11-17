@@ -2,8 +2,8 @@ Azure Janitor
 ==============================
 
 [![license](https://img.shields.io/github/license/webdevops/azure-janitor.svg)](https://github.com/webdevops/azure-janitor/blob/master/LICENSE)
-[![Docker](https://img.shields.io/badge/docker-webdevops%2Fazure--janitor-blue.svg?longCache=true&style=flat&logo=docker)](https://hub.docker.com/r/webdevops/azure-janitor/)
-[![Docker Build Status](https://img.shields.io/docker/build/webdevops/azure-janitor.svg)](https://hub.docker.com/r/webdevops/azure-janitor/)
+[![DockerHub](https://img.shields.io/badge/DockerHub-webdevops%2Fazure--janitor-blue)](https://hub.docker.com/r/webdevops/azure-janitor/)
+[![Quay.io](https://img.shields.io/badge/Quay.io-webdevops%2Fazure--janitor-blue)](https://quay.io/repository/webdevops/azure-janitor)
 
 Janitor for Azure ResourceGroups and Resources based on ttl tag and Deployments based on TTL and limit.
 

@@ -9,6 +9,7 @@ RUN go mod download
 
 # Compile
 COPY ./ /go/src/github.com/webdevops/azure-janitor
+RUN make test
 RUN make lint
 RUN make build
 RUN ./azure-janitor --help
