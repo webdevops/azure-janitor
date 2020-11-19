@@ -7,26 +7,36 @@ Azure Janitor
 
 Janitor for Azure ResourceGroups and Resources based on ttl tag and Deployments based on TTL and limit.
 
-Configuration
--------------
+Usage
+-----
 
-Normally no configuration is needed but can be customized using environment variables.
+```
+Usage:
+  azure-janitor [OPTIONS]
 
-| Environment variable              | DefaultValue                | Description                                                       |
-|-----------------------------------|-----------------------------|-------------------------------------------------------------------|
-| `AZURE_SUBSCRIPTION_ID`           | `empty`                     | Azure Subscription IDs (empty for auto lookup)                    |
-| `DRYRUN`                          | `empty`                     | DryRun (non deleting mode)                                        |
-| `SERVER_BIND`                     | `:8080`                     | IP/Port binding for metrics and healthcheck                       |
-| `JANITOR_INTERVAL`                | `1h`                        | How often Azure Janitor should cleanup the subscriptions (time.Duration) |
-| `JANITOR_TAG`                     | `ttl`                       | Resource tag name for ttl value (non deleting mode)               |
-| `JANITOR_RESOURCE_APIVERSION`     | `2019-03-01`                | API version for Azure Resource deletion                           |
-| `JANITOR_DISABLE_RESOURCEGROUPS`  | `false`                     | Enable/Disable Azure ResourceGroup clearing                       |
-| `JANITOR_DISABLE_RESOURCES`       | `false`                     | Enable/Disable Azure Resource clearing                            |
-| `JANITOR_DISABLE_DEPLOYMENTS`     | `false`                     | Enable/Disable Azure Deployment clearing                          |
-| `JANITOR_FILTER_RESOURCES`        | `empty`                     | Additional Azure REST API $filter for Azure ResourceGroups        |
-| `JANITOR_FILTER_RESOURCEGROUPS`   | `empty`                     | Additional Azure REST API $filter for Azure Resources             |
-| `JANITOR_DEPLOYMENT_TTL`          | `8760h`                     | TTL (Expiry) for Azure ResourceGroup Deployments                  |
-| `JANITOR_DEPLOYMENT_LIMIT`        | `700`                       | Limit (count) of Azure ResourceGroup Deployments per ResourceGroup (Azure limit: 800) |
+Application Options:
+      --dry-run                         Dry run (no delete) [$DRYRUN]
+      --debug                           debug mode [$DEBUG]
+  -v, --verbose                         verbose mode [$VERBOSE]
+      --log.json                        Switch log output to json format [$LOG_JSON]
+      --azure-environment=              Azure environment name (default: AZUREPUBLICCLOUD) [$AZURE_ENVIRONMENT]
+      --azure-subscription=             Azure subscription ID [$AZURE_SUBSCRIPTION_ID]
+      --janitor.interval=               Janitor interval (time.duration) (default: 1h) [$JANITOR_INTERVAL]
+      --janitor.tag=                    Janitor azure tag (string) (default: ttl) [$JANITOR_TAG]
+      --janitor.deployment.ttl=         Janitor deploument ttl (time.duration) (default: 8760h)
+                                        [$JANITOR_DEPLOYMENT_TTL]
+      --janitor.deployment.limit=       Janitor deploument limit count (int) (default: 700) [$JANITOR_DEPLOYMENT_LIMIT]
+      --janitor.disable.resourcegroups  Disable Azure ResourceGroups cleanup [$JANITOR_DISABLE_RESOURCEGROUPS]
+      --janitor.disable.resources       Disable Azure Resources cleanup [$JANITOR_DISABLE_RESOURCES]
+      --janitor.disable.deployments     Disable Azure Deployments cleanup [$JANITOR_DISABLE_DEPLOYMENTS]
+      --janitor.filter.resourcegroups=  Additional $filter for Azure REST API for ResourceGroups
+                                        [$JANITOR_FILTER_RESOURCEGROUPS]
+      --janitor.filter.resources=       Additional $filter for Azure REST API for Resources [$JANITOR_FILTER_RESOURCES]
+      --bind=                           Server address (default: :8080) [$SERVER_BIND]
+
+Help Options:
+  -h, --help                            Show this help message
+```
 
 for Azure API authentication (using ENV vars) see https://github.com/Azure/azure-sdk-for-go#authentication
 

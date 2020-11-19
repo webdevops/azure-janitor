@@ -4,14 +4,16 @@ import (
 	"context"
 	"github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/resources/mgmt/resources"
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/resources/mgmt/subscriptions"
-	"github.com/google/logger"
 	"github.com/prometheus/client_golang/prometheus"
+	log "github.com/sirupsen/logrus"
 	prometheusCommon "github.com/webdevops/go-prometheus-common"
 )
 
 func (j *Janitor) runResourceGroups(ctx context.Context, subscription subscriptions.Subscription, filter string, ttlMetricsChan chan<- *prometheusCommon.MetricList) {
-	client := resources.NewGroupsClient(*subscription.SubscriptionID)
-	client.Authorizer = AzureAuthorizer
+	contextLogger := log.WithField("task", "resourceGroup")
+
+	client := resources.NewGroupsClientWithBaseURI(azureEnvironment.ResourceManagerEndpoint, *subscription.SubscriptionID)
+	client.Authorizer = azureAuthorizer
 
 	resourceTtl := prometheusCommon.NewMetricsList()
 
@@ -24,8 +26,10 @@ func (j *Janitor) runResourceGroups(ctx context.Context, subscription subscripti
 		// resourceGroup.Type is nil
 		resourceType := "Microsoft.Resources/resourceGroups"
 
+		resourceLogger := contextLogger.WithField("resource", *resourceGroup.ID)
+
 		if resourceGroup.Tags != nil {
-			resourceExpiryTime, resourceExpired, resourceTagUpdateNeeded := j.checkAzureResourceExpiry(resourceType, *resourceGroup.ID, &resourceGroup.Tags)
+			resourceExpiryTime, resourceExpired, resourceTagUpdateNeeded := j.checkAzureResourceExpiry(resourceLogger, resourceType, *resourceGroup.ID, &resourceGroup.Tags)
 
 			if resourceExpiryTime != nil {
 				resourceTtl.AddTime(prometheus.Labels{
@@ -37,17 +41,17 @@ func (j *Janitor) runResourceGroups(ctx context.Context, subscription subscripti
 			}
 
 			if !opts.DryRun && resourceTagUpdateNeeded {
-				logger.Infof("%s: tag update needed, updating resource", *resourceGroup.ID)
+				resourceLogger.Infof("tag update needed, updating resource")
 				resourceGroupOpts := resources.GroupPatchable{
 					Tags: resourceGroup.Tags,
 				}
 
 				if _, err := client.Update(ctx, *resourceGroup.Name, resourceGroupOpts); err == nil {
 					// successfully deleted
-					logger.Infof("%s: successfully updated", *resourceGroup.ID)
+					resourceLogger.Infof("successfully updated")
 				} else {
 					// failed delete
-					logger.Errorf("%s: ERROR %s", *resourceGroup.ID, err)
+					resourceLogger.Errorf("ERROR %s", err)
 
 					Prometheus.MetricErrors.With(prometheus.Labels{
 						"resourceType": resourceType,
@@ -56,17 +60,17 @@ func (j *Janitor) runResourceGroups(ctx context.Context, subscription subscripti
 			}
 
 			if !opts.DryRun && resourceExpired {
-				logger.Infof("%s: expired, trying to delete", *resourceGroup.ID)
+				resourceLogger.Infof("expired, trying to delete")
 				if _, err := client.Delete(ctx, *resourceGroup.Name); err == nil {
 					// successfully deleted
-					logger.Infof("%s: successfully deleted", *resourceGroup.ID)
+					resourceLogger.Infof("successfully deleted")
 
 					Prometheus.MetricDeletedResource.With(prometheus.Labels{
 						"resourceType": resourceType,
 					}).Inc()
 				} else {
 					// failed delete
-					logger.Errorf("%s: ERROR %s", *resourceGroup.ID, err)
+					resourceLogger.Errorf("ERROR %s", err)
 
 					Prometheus.MetricErrors.With(prometheus.Labels{
 						"resourceType": resourceType,

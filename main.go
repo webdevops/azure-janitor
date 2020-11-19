@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/resources/mgmt/subscriptions"
 	"github.com/Azure/go-autorest/autorest"
@@ -11,11 +10,13 @@ import (
 	"github.com/jessevdk/go-flags"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"log"
+	log "github.com/sirupsen/logrus"
+	"github.com/webdevops/azure-janitor/config"
 	"net/http"
 	"os"
+	"path"
+	"runtime"
 	"strings"
-	"time"
 )
 
 const (
@@ -23,11 +24,13 @@ const (
 )
 
 var (
-	argparser          *flags.Parser
-	Verbose            bool
-	Logger             *DaemonLogger
-	AzureAuthorizer    autorest.Authorizer
-	AzureSubscriptions []subscriptions.Subscription
+	argparser *flags.Parser
+	opts      config.Opts
+
+	azureAuthorizer    autorest.Authorizer
+	azureSubscriptions []subscriptions.Subscription
+
+	azureEnvironment azure.Environment //nolint:golint,unused
 
 	// Git version information
 	gitCommit = "<unknown>"
@@ -41,81 +44,47 @@ var (
 	}
 )
 
-var opts struct {
-	// general settings
-	Verbose []bool `long:"verbose" short:"v" env:"VERBOSE" description:"Verbose mode"`
-	DryRun  bool   `long:"dry-run"           env:"DRYRUN"  description:"Dry run (no delete)"`
-
-	// server settings
-	ServerBind string `long:"bind" env:"SERVER_BIND" description:"Server address" default:":8080"`
-
-	// azure settings
-	AzureSubscription []string `long:"azure.subscription" env:"AZURE_SUBSCRIPTION_ID" env-delim:" "  description:"Azure subscription ID"`
-	azureEnvironment  azure.Environment
-
-	// Janitor settings
-	JanitorInterval time.Duration `long:"janitor.interval" env:"JANITOR_INTERVAL"  description:"Janitor interval (time.duration)"  default:"1h"`
-	JanitorTag      string        `long:"janitor.tag"      env:"JANITOR_TAG"  description:"Janitor azure tag (string)"  default:"ttl"`
-
-	JanitorDeploymentsTtl   time.Duration `long:"janitor.deployment.ttl"      env:"JANITOR_DEPLOYMENT_TTL"  description:"Janitor deploument ttl (time.duration)"  default:"8760h"`
-	JanitorDeploymentsLimit int64         `long:"janitor.deployment.limit"      env:"JANITOR_DEPLOYMENT_LIMIT"  description:"Janitor deploument limit count (int)"  default:"700"`
-
-	JanitorDisableResourceGroups bool `long:"janitor.disable.resourcegroups" env:"JANITOR_DISABLE_RESOURCEGROUPS"  description:"Disable Azure ResourceGroups cleanup"`
-	JanitorDisableResources      bool `long:"janitor.disable.resources"      env:"JANITOR_DISABLE_RESOURCES"  description:"Disable Azure Resources cleanup"`
-	JanitorDisableDeployments    bool `long:"janitor.disable.deployments"      env:"JANITOR_DISABLE_DEPLOYMENTS"  description:"Disable Azure Deployments cleanup"`
-
-	JanitorAdditionalFilterResourceGroups *string `long:"janitor.filter.resourcegroups" env:"JANITOR_FILTER_RESOURCEGROUPS"  description:"Additional $filter for Azure REST API for ResourceGroups"`
-	JanitorAdditionalFilterResources      *string `long:"janitor.filter.resources"      env:"JANITOR_FILTER_RESOURCES"  description:"Additional $filter for Azure REST API for Resources"`
-	janitorFilterResourceGroups           string
-	janitorFilterResources                string
-}
-
 func main() {
 	initArgparser()
 
-	// set verbosity
-	Verbose = len(opts.Verbose) >= 1
+	log.Infof("starting azure-janitor v%s (%s; %s; by %v)", gitTag, gitCommit, runtime.Version(), Author)
+	log.Info(string(opts.GetJson()))
 
-	Logger = NewLogger(log.Lshortfile, Verbose)
-	defer Logger.Close()
-
-	// set verbosity
-	Verbose = len(opts.Verbose) >= 1
-
-	Logger.Infof("Init Azure Janitor exporter v%s (%s; by %v)", gitTag, gitCommit, Author)
-
-	Logger.Infof("Init Azure connection")
+	log.Infof("init Azure connection")
 	initAzureConnection()
 	initMetricCollector()
 
-	Logger.Infof("Init Janitor")
-	Logger.Infof("  interval: %s", opts.JanitorInterval.String())
-	Logger.Infof("  tag: %s", opts.JanitorTag)
+	log.Infof("init Janitor")
 
-	if !opts.JanitorDisableResourceGroups {
-		Logger.Infof("  enabled Azure ResourceGroups cleanup")
-		Logger.Infof("    filter: %s", opts.janitorFilterResourceGroups)
+	if !opts.Janitor.DisableResourceGroups {
+		log.Infof("enabled Azure ResourceGroups cleanup (filter: %s)", opts.Janitor.FilterResourceGroups)
 	} else {
-		Logger.Infof("  disabled Azure ResourceGroups cleanup")
+		log.Infof("disabled Azure ResourceGroups cleanup")
 	}
 
-	if !opts.JanitorDisableResources {
-		Logger.Infof("  enabled Azure Resources cleanup")
-		Logger.Infof("    filter: %s", opts.janitorFilterResources)
+	if !opts.Janitor.DisableResources {
+		log.Infof("enabled Azure Resources cleanup (filter: %s)", opts.Janitor.FilterResources)
 	} else {
-		Logger.Infof("  disabled Azure Resources cleanup")
+		log.Infof("disabled Azure Resources cleanup")
+	}
+
+	if !opts.Janitor.DisableDeployments {
+		log.Infof("enabled Azure ResourceGroups Deployments cleanup (limit: %v, ttl: %v)", opts.Janitor.DeploymentsLimit, opts.Janitor.DeploymentsTtl.String())
+	} else {
+		log.Infof("disabled Azure ResourceGroups Deployments cleanup")
 	}
 
 	j := Janitor{}
 	j.Init()
 	j.Run()
 
-	Logger.Infof("Starting http server on %s", opts.ServerBind)
+	log.Infof("starting http server on %s", opts.ServerBind)
 	startHttpServer()
 }
 
 // init argparser and parse/validate arguments
 func initArgparser() {
+
 	argparser = flags.NewParser(&opts, flags.Default)
 	_, err := argparser.Parse()
 
@@ -124,34 +93,64 @@ func initArgparser() {
 		if flagsErr, ok := err.(*flags.Error); ok && flagsErr.Type == flags.ErrHelp {
 			os.Exit(0)
 		} else {
-			fmt.Println(err)
 			fmt.Println()
 			argparser.WriteHelp(os.Stdout)
 			os.Exit(1)
 		}
 	}
 
+	// verbose level
+	if opts.Logger.Verbose {
+		log.SetLevel(log.DebugLevel)
+	}
+
+	// debug level
+	if opts.Logger.Debug {
+		log.SetReportCaller(true)
+		log.SetLevel(log.TraceLevel)
+		log.SetFormatter(&log.TextFormatter{
+			CallerPrettyfier: func(f *runtime.Frame) (string, string) {
+				s := strings.Split(f.Function, ".")
+				funcName := s[len(s)-1]
+				return funcName, fmt.Sprintf("%s:%d", path.Base(f.File), f.Line)
+			},
+		})
+	}
+
+	// json log format
+	if opts.Logger.LogJson {
+		log.SetReportCaller(true)
+		log.SetFormatter(&log.JSONFormatter{
+			DisableTimestamp: true,
+			CallerPrettyfier: func(f *runtime.Frame) (string, string) {
+				s := strings.Split(f.Function, ".")
+				funcName := s[len(s)-1]
+				return funcName, fmt.Sprintf("%s:%d", path.Base(f.File), f.Line)
+			},
+		})
+	}
+
 	// resourceGroup filter
-	opts.janitorFilterResourceGroups = fmt.Sprintf(
+	opts.Janitor.FilterResourceGroups = fmt.Sprintf(
 		"tagName eq '%s'",
-		strings.Replace(opts.JanitorTag, "'", "\\'", -1),
+		strings.Replace(opts.Janitor.Tag, "'", "\\'", -1),
 	)
 
 	// add additional filter
-	if opts.JanitorAdditionalFilterResourceGroups != nil {
-		opts.janitorFilterResourceGroups = fmt.Sprintf(
+	if opts.Janitor.AdditionalFilterResourceGroups != nil {
+		opts.Janitor.FilterResourceGroups = fmt.Sprintf(
 			"%s and %s",
-			opts.janitorFilterResourceGroups,
-			*opts.JanitorAdditionalFilterResourceGroups,
+			opts.Janitor.FilterResourceGroups,
+			*opts.Janitor.AdditionalFilterResourceGroups,
 		)
 	}
 
 	// resource (if we specify tagValue here we don't get the tag.. wtf?!)
-	opts.janitorFilterResources = ""
+	opts.Janitor.FilterResources = ""
 
 	// add additional filter
-	if opts.JanitorAdditionalFilterResources != nil {
-		opts.janitorFilterResources = *opts.JanitorAdditionalFilterResources
+	if opts.Janitor.AdditionalFilterResources != nil {
+		opts.Janitor.FilterResources = *opts.Janitor.AdditionalFilterResources
 	}
 }
 
@@ -160,46 +159,41 @@ func initAzureConnection() {
 	var err error
 	ctx := context.Background()
 
+	// get environment
+	azureEnvironment, err = azure.EnvironmentFromName(*opts.Azure.Environment)
+	if err != nil {
+		log.Panic(err)
+	}
+
 	// setup azure authorizer
-	AzureAuthorizer, err = auth.NewAuthorizerFromEnvironment()
+	azureAuthorizer, err = auth.NewAuthorizerFromEnvironment()
 	if err != nil {
 		panic(err)
 	}
 	subscriptionsClient := subscriptions.NewClient()
-	subscriptionsClient.Authorizer = AzureAuthorizer
+	subscriptionsClient.Authorizer = azureAuthorizer
 
-	if len(opts.AzureSubscription) == 0 {
+	if len(opts.Azure.Subscription) == 0 {
 		// auto lookup subscriptions
 		listResult, err := subscriptionsClient.List(ctx)
 		if err != nil {
 			panic(err)
 		}
-		AzureSubscriptions = listResult.Values()
+		azureSubscriptions = listResult.Values()
 
-		if len(AzureSubscriptions) == 0 {
-			panic(errors.New("No Azure Subscriptions found via auto detection, does this ServicePrincipal have read permissions to the subcriptions?"))
+		if len(azureSubscriptions) == 0 {
+			log.Panic("no Azure Subscriptions found via auto detection, does this ServicePrincipal have read permissions to the subcriptions?")
 		}
 	} else {
 		// fixed subscription list
-		AzureSubscriptions = []subscriptions.Subscription{}
-		for _, subId := range opts.AzureSubscription {
+		azureSubscriptions = []subscriptions.Subscription{}
+		for _, subId := range opts.Azure.Subscription {
 			result, err := subscriptionsClient.Get(ctx, subId)
 			if err != nil {
 				panic(err)
 			}
-			AzureSubscriptions = append(AzureSubscriptions, result)
+			azureSubscriptions = append(azureSubscriptions, result)
 		}
-	}
-
-	// try to get cloud name, defaults to public cloud name
-	azureEnvName := azure.PublicCloud.Name
-	if env := os.Getenv("AZURE_ENVIRONMENT"); env != "" {
-		azureEnvName = env
-	}
-
-	opts.azureEnvironment, err = azure.EnvironmentFromName(azureEnvName)
-	if err != nil {
-		panic(err)
 	}
 }
 
@@ -254,5 +248,5 @@ func initMetricCollector() {
 // start and handle prometheus handler
 func startHttpServer() {
 	http.Handle("/metrics", promhttp.Handler())
-	Logger.Fatal(http.ListenAndServe(opts.ServerBind, nil))
+	log.Fatal(http.ListenAndServe(opts.ServerBind, nil))
 }

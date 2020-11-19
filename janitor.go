@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/resources/mgmt/features"
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/resources/mgmt/subscriptions"
-	"github.com/google/logger"
 	tparse "github.com/karrick/tparse/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rickb777/date/period"
+	log "github.com/sirupsen/logrus"
 	prometheusCommon "github.com/webdevops/go-prometheus-common"
 	"strings"
 	"sync"
@@ -51,27 +51,27 @@ func (j *Janitor) Run() {
 	go func() {
 		for {
 			startTime := time.Now()
-			logger.Infof("starting janitor run")
+			log.Infof("start janitor run")
 			var wgMain sync.WaitGroup
 			var wgMetrics sync.WaitGroup
 
 			callbackTtlMetrics := make(chan *prometheusCommon.MetricList)
 
 			// subscription processing
-			for _, subscription := range AzureSubscriptions {
+			for _, subscription := range azureSubscriptions {
 				wgMain.Add(1)
 				go func(subscription subscriptions.Subscription) {
 					defer wgMain.Done()
 
-					if !opts.JanitorDisableResourceGroups {
-						j.runResourceGroups(ctx, subscription, opts.janitorFilterResourceGroups, callbackTtlMetrics)
+					if !opts.Janitor.DisableResourceGroups {
+						j.runResourceGroups(ctx, subscription, opts.Janitor.FilterResourceGroups, callbackTtlMetrics)
 					}
 
-					if !opts.JanitorDisableResources {
-						j.runResources(ctx, subscription, opts.janitorFilterResources, callbackTtlMetrics)
+					if !opts.Janitor.DisableResources {
+						j.runResources(ctx, subscription, opts.Janitor.FilterResources, callbackTtlMetrics)
 					}
 
-					if !opts.JanitorDisableDeployments {
+					if !opts.Janitor.DisableDeployments {
 						j.runDeployments(ctx, subscription, callbackTtlMetrics)
 					}
 				}(subscription)
@@ -105,8 +105,8 @@ func (j *Janitor) Run() {
 			duration := time.Since(startTime)
 			Prometheus.MetricDuration.With(prometheus.Labels{}).Set(duration.Seconds())
 
-			logger.Infof("Finished run in %s, waiting %s", duration.String(), opts.JanitorInterval.String())
-			time.Sleep(opts.JanitorInterval)
+			log.WithField("duration", duration.Seconds()).Infof("finished run in %s, waiting %s", duration.String(), opts.Janitor.Interval.String())
+			time.Sleep(opts.Janitor.Interval)
 		}
 	}()
 }
@@ -115,9 +115,9 @@ func (j *Janitor) initAuzreApiVersions() {
 	ctx := context.Background()
 
 	j.apiVersionMap = map[string]map[string]string{}
-	for _, subscription := range AzureSubscriptions {
+	for _, subscription := range azureSubscriptions {
 		client := features.NewProvidersClient(*subscription.SubscriptionID)
-		client.Authorizer = AzureAuthorizer
+		client.Authorizer = azureAuthorizer
 
 		subscriptionId := *subscription.SubscriptionID
 
@@ -176,12 +176,12 @@ func (j *Janitor) getAzureApiVersionForSubscriptionResourceType(subscriptionId, 
 	return
 }
 
-func (j *Janitor) checkAzureResourceExpiry(resourceType, resourceId string, resourceTags *map[string]*string) (resourceExpireTime *time.Time, resourceExpired bool, resourceTagRewriteNeeded bool) {
+func (j *Janitor) checkAzureResourceExpiry(logger *log.Entry, resourceType, resourceId string, resourceTags *map[string]*string) (resourceExpireTime *time.Time, resourceExpired bool, resourceTagRewriteNeeded bool) {
 	tagName, ttlValue := j.getTtlTagFromAzureResoruce(*resourceTags)
 
 	if ttlValue != nil {
-		if Verbose {
-			logger.Infof("%s: checking ttl", resourceId)
+		if opts.Logger.Verbose {
+			logger.Infof("checking ttl")
 		}
 
 		tagValueParsed, tagValueExpired, timeParseErr := j.checkExpiryDate(*ttlValue)
@@ -189,25 +189,25 @@ func (j *Janitor) checkAzureResourceExpiry(resourceType, resourceId string, reso
 			// date parsed successfully
 			if tagValueExpired {
 				if opts.DryRun {
-					logger.Infof("%s: expired, but dryrun active", resourceId)
+					logger.Infof("expired, but dryrun active")
 				} else {
 					resourceExpired = true
 				}
 			} else {
-				if Verbose {
-					logger.Infof("%s: NOT expired", resourceId)
+				if opts.Logger.Verbose {
+					logger.Infof("NOT expired")
 				}
 			}
 
 			resourceExpireTime = tagValueParsed
 		} else if val, durationParseErr := j.checkExpiryDuration(*ttlValue); durationParseErr == nil && val != nil {
 			// try parse as duration
-			logger.Infof("%s: found valid duration (%v)", resourceId, *ttlValue)
+			logger.Infof("found valid duration (%v)", *ttlValue)
 			resourceTagRewriteNeeded = true
 			ttlValue := val.Format(time.RFC3339)
 			(*resourceTags)[*tagName] = &ttlValue
 		} else {
-			logger.Errorf("%s: ERROR %s", resourceId, timeParseErr)
+			logger.Errorf("ERROR %s", timeParseErr)
 		}
 	}
 
@@ -216,7 +216,7 @@ func (j *Janitor) checkAzureResourceExpiry(resourceType, resourceId string, reso
 
 func (j *Janitor) getTtlTagFromAzureResoruce(tags map[string]*string) (ttlName, ttlValue *string) {
 	for tagName, tagValue := range tags {
-		if tagName == opts.JanitorTag && tagValue != nil && *tagValue != "" {
+		if tagName == opts.Janitor.Tag && tagValue != nil && *tagValue != "" {
 			val := tagName
 			ttlName = &val
 			ttlValue = tagValue
