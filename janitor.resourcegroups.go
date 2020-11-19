@@ -9,7 +9,6 @@ import (
 	prometheusCommon "github.com/webdevops/go-prometheus-common"
 )
 
-
 func (j *Janitor) runResourceGroups(ctx context.Context, subscription subscriptions.Subscription, filter string, ttlMetricsChan chan<- *prometheusCommon.MetricList) {
 	client := resources.NewGroupsClient(*subscription.SubscriptionID)
 	client.Authorizer = AzureAuthorizer

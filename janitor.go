@@ -2,18 +2,17 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/resources/mgmt/features"
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/resources/mgmt/subscriptions"
 	"github.com/google/logger"
+	tparse "github.com/karrick/tparse/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rickb777/date/period"
 	prometheusCommon "github.com/webdevops/go-prometheus-common"
 	"strings"
 	"sync"
 	"time"
-	tparse "github.com/karrick/tparse/v2"
 )
 
 type (
@@ -21,7 +20,6 @@ type (
 		apiVersionMap map[string]map[string]string
 	}
 )
-
 
 var (
 	janitorTimeFormats = []string{
@@ -42,6 +40,7 @@ var (
 		time.RFC3339Nano,
 	}
 )
+
 func (j *Janitor) Init() {
 	j.initAuzreApiVersions()
 }
@@ -52,7 +51,7 @@ func (j *Janitor) Run() {
 	go func() {
 		for {
 			startTime := time.Now()
-			logger.Infof("Starting run")
+			logger.Infof("starting janitor run")
 			var wgMain sync.WaitGroup
 			var wgMetrics sync.WaitGroup
 
@@ -103,7 +102,7 @@ func (j *Janitor) Run() {
 			close(callbackTtlMetrics)
 			wgMetrics.Wait()
 
-			duration := time.Now().Sub(startTime)
+			duration := time.Since(startTime)
 			Prometheus.MetricDuration.With(prometheus.Labels{}).Set(duration.Seconds())
 
 			logger.Infof("Finished run in %s, waiting %s", duration.String(), opts.JanitorInterval.String())
@@ -153,7 +152,7 @@ func (j *Janitor) initAuzreApiVersions() {
 							lastApiPreviewVersion = apiVersion
 						}
 					} else {
-						if lastApiVersion == "" ||  lastApiVersion > apiVersion {
+						if lastApiVersion == "" || lastApiVersion > apiVersion {
 							lastApiVersion = apiVersion
 						}
 					}
@@ -177,7 +176,7 @@ func (j *Janitor) getAzureApiVersionForSubscriptionResourceType(subscriptionId, 
 	return
 }
 
-func (j *Janitor)  checkAzureResourceExpiry(resourceType, resourceId string, resourceTags *map[string]*string) (resourceExpireTime *time.Time, resourceExpired bool, resourceTagRewriteNeeded bool) {
+func (j *Janitor) checkAzureResourceExpiry(resourceType, resourceId string, resourceTags *map[string]*string) (resourceExpireTime *time.Time, resourceExpired bool, resourceTagRewriteNeeded bool) {
 	tagName, ttlValue := j.getTtlTagFromAzureResoruce(*resourceTags)
 
 	if ttlValue != nil {
@@ -218,7 +217,8 @@ func (j *Janitor)  checkAzureResourceExpiry(resourceType, resourceId string, res
 func (j *Janitor) getTtlTagFromAzureResoruce(tags map[string]*string) (ttlName, ttlValue *string) {
 	for tagName, tagValue := range tags {
 		if tagName == opts.JanitorTag && tagValue != nil && *tagValue != "" {
-			ttlName = &tagName
+			val := tagName
+			ttlName = &val
 			ttlValue = tagValue
 		}
 	}
@@ -248,7 +248,7 @@ func (j *Janitor) checkExpiryDuration(value string) (parsedTime *time.Time, err 
 		return
 	}
 
-	err = errors.New(fmt.Sprintf("Unable to parse '%v' as duration", value))
+	err = fmt.Errorf("unable to parse '%v' as duration", value)
 
 	return
 }
@@ -275,10 +275,7 @@ func (j *Janitor) checkExpiryDate(value string) (parsedTime *time.Time, expired 
 		// check if parsed time is before NOW -> expired
 		expired = parsedTime.Before(time.Now())
 	} else {
-		err = errors.New(fmt.Sprintf(
-			"Unable to parse time '%s'",
-			value,
-		))
+		err = fmt.Errorf("unable to parse time '%s'", value)
 	}
 
 	return

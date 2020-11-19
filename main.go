@@ -218,14 +218,12 @@ func initMetricCollector() {
 			Name: "azurejanitor_resources_ttl",
 			Help: "AzureJanitor number of resources with TTL",
 		},
-		append(
-			[]string{
-				"resourceID",
-				"subscriptionID",
-				"resourceGroup",
-				"provider",
-			},
-		),
+		[]string{
+			"resourceID",
+			"subscriptionID",
+			"resourceGroup",
+			"provider",
+		},
 	)
 
 	Prometheus.MetricDeletedResource = prometheus.NewCounterVec(
@@ -233,22 +231,18 @@ func initMetricCollector() {
 			Name: "azurejanitor_resources_deleted",
 			Help: "AzureJanitor deleted resources",
 		},
-		append(
-			[]string{
-				"resourceType",
-			},
-		),
+		[]string{
+			"resourceType",
+		},
 	)
 	Prometheus.MetricErrors = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "azurejanitor_errors",
 			Help: "AzureJanitor error counter",
 		},
-		append(
-			[]string{
-				"resourceType",
-			},
-		),
+		[]string{
+			"resourceType",
+		},
 	)
 
 	prometheus.MustRegister(Prometheus.MetricDuration)

@@ -6,8 +6,8 @@ import (
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/resources/mgmt/subscriptions"
 	"github.com/google/logger"
 	"github.com/prometheus/client_golang/prometheus"
-	"time"
 	prometheusCommon "github.com/webdevops/go-prometheus-common"
+	"time"
 )
 
 func (j *Janitor) runDeployments(ctx context.Context, subscription subscriptions.Subscription, ttlMetricsChan chan<- *prometheusCommon.MetricList) {
@@ -46,7 +46,7 @@ func (j *Janitor) runDeployments(ctx context.Context, subscription subscriptions
 				deleteDeployment = true
 			} else if deployment.Properties != nil && deployment.Properties.Timestamp != nil {
 				// expire check
-				deploymentAge := time.Now().Sub(deployment.Properties.Timestamp.Time)
+				deploymentAge := time.Since(deployment.Properties.Timestamp.Time)
 				if deploymentAge.Seconds() > opts.JanitorDeploymentsTtl.Seconds() {
 					deleteDeployment = true
 				}
