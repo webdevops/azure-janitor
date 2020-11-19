@@ -15,27 +15,26 @@ Usage:
   azure-janitor [OPTIONS]
 
 Application Options:
-      --dry-run                         Dry run (no delete) [$DRYRUN]
-      --debug                           debug mode [$DEBUG]
-  -v, --verbose                         verbose mode [$VERBOSE]
-      --log.json                        Switch log output to json format [$LOG_JSON]
-      --azure-environment=              Azure environment name (default: AZUREPUBLICCLOUD) [$AZURE_ENVIRONMENT]
-      --azure-subscription=             Azure subscription ID [$AZURE_SUBSCRIPTION_ID]
-      --janitor.interval=               Janitor interval (time.duration) (default: 1h) [$JANITOR_INTERVAL]
-      --janitor.tag=                    Janitor azure tag (string) (default: ttl) [$JANITOR_TAG]
-      --janitor.deployment.ttl=         Janitor deploument ttl (time.duration) (default: 8760h)
-                                        [$JANITOR_DEPLOYMENT_TTL]
-      --janitor.deployment.limit=       Janitor deploument limit count (int) (default: 700) [$JANITOR_DEPLOYMENT_LIMIT]
-      --janitor.disable.resourcegroups  Disable Azure ResourceGroups cleanup [$JANITOR_DISABLE_RESOURCEGROUPS]
-      --janitor.disable.resources       Disable Azure Resources cleanup [$JANITOR_DISABLE_RESOURCES]
-      --janitor.disable.deployments     Disable Azure Deployments cleanup [$JANITOR_DISABLE_DEPLOYMENTS]
-      --janitor.filter.resourcegroups=  Additional $filter for Azure REST API for ResourceGroups
-                                        [$JANITOR_FILTER_RESOURCEGROUPS]
-      --janitor.filter.resources=       Additional $filter for Azure REST API for Resources [$JANITOR_FILTER_RESOURCES]
-      --bind=                           Server address (default: :8080) [$SERVER_BIND]
+      --dry-run                        Dry run (no delete) [$DRYRUN]
+      --debug                          debug mode [$DEBUG]
+  -v, --verbose                        verbose mode [$VERBOSE]
+      --log.json                       Switch log output to json format [$LOG_JSON]
+      --azure-environment=             Azure environment name (default: AZUREPUBLICCLOUD) [$AZURE_ENVIRONMENT]
+      --azure-subscription=            Azure subscription ID [$AZURE_SUBSCRIPTION_ID]
+      --janitor.interval=              Janitor interval (time.duration) (default: 1h) [$JANITOR_INTERVAL]
+      --janitor.tag=                   Janitor azure tag (string) (default: ttl) [$JANITOR_TAG]
+      --janitor.deployment.ttl=        Janitor deploument ttl (time.duration) (default: 8760h) [$JANITOR_DEPLOYMENT_TTL]
+      --janitor.deployment.limit=      Janitor deploument limit count (int) (default: 700) [$JANITOR_DEPLOYMENT_LIMIT]
+      --janitor.enable.resourcegroups  Enable Azure ResourceGroups cleanup [$JANITOR_ENABLE_RESOURCEGROUPS]
+      --janitor.enable.resources       Enable Azure Resources cleanup [$JANITOR_ENABLE_RESOURCES]
+      --janitor.enable.deployments     Enable Azure Deployments cleanup [$JANITOR_ENABLE_DEPLOYMENTS]
+      --janitor.filter.resourcegroups= Additional $filter for Azure REST API for ResourceGroups
+                                       [$JANITOR_FILTER_RESOURCEGROUPS]
+      --janitor.filter.resources=      Additional $filter for Azure REST API for Resources [$JANITOR_FILTER_RESOURCES]
+      --bind=                          Server address (default: :8080) [$SERVER_BIND]
 
 Help Options:
-  -h, --help                            Show this help message
+  -h, --help                           Show this help message
 ```
 
 for Azure API authentication (using ENV vars) see https://github.com/Azure/azure-sdk-for-go#authentication

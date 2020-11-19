@@ -56,19 +56,19 @@ func main() {
 
 	log.Infof("init Janitor")
 
-	if !opts.Janitor.DisableResourceGroups {
+	if opts.Janitor.EnableResourceGroups {
 		log.Infof("enabled Azure ResourceGroups cleanup (filter: %s)", opts.Janitor.FilterResourceGroups)
 	} else {
 		log.Infof("disabled Azure ResourceGroups cleanup")
 	}
 
-	if !opts.Janitor.DisableResources {
+	if opts.Janitor.EnableResources {
 		log.Infof("enabled Azure Resources cleanup (filter: %s)", opts.Janitor.FilterResources)
 	} else {
 		log.Infof("disabled Azure Resources cleanup")
 	}
 
-	if !opts.Janitor.DisableDeployments {
+	if opts.Janitor.EnableDeployments {
 		log.Infof("enabled Azure ResourceGroups Deployments cleanup (limit: %v, ttl: %v)", opts.Janitor.DeploymentsLimit, opts.Janitor.DeploymentsTtl.String())
 	} else {
 		log.Infof("disabled Azure ResourceGroups Deployments cleanup")
@@ -151,6 +151,10 @@ func initArgparser() {
 	// add additional filter
 	if opts.Janitor.AdditionalFilterResources != nil {
 		opts.Janitor.FilterResources = *opts.Janitor.AdditionalFilterResources
+	}
+
+	if !opts.Janitor.EnableResourceGroups && !opts.Janitor.EnableResources && !opts.Janitor.EnableDeployments {
+		log.Fatal("no janitor task (resources, resourcegroups, deployments) enabled, not starting")
 	}
 }
 

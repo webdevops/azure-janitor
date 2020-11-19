@@ -63,15 +63,15 @@ func (j *Janitor) Run() {
 				go func(subscription subscriptions.Subscription) {
 					defer wgMain.Done()
 
-					if !opts.Janitor.DisableResourceGroups {
+					if opts.Janitor.EnableResourceGroups {
 						j.runResourceGroups(ctx, subscription, opts.Janitor.FilterResourceGroups, callbackTtlMetrics)
 					}
 
-					if !opts.Janitor.DisableResources {
+					if opts.Janitor.EnableResources {
 						j.runResources(ctx, subscription, opts.Janitor.FilterResources, callbackTtlMetrics)
 					}
 
-					if !opts.Janitor.DisableDeployments {
+					if opts.Janitor.EnableDeployments {
 						j.runDeployments(ctx, subscription, callbackTtlMetrics)
 					}
 				}(subscription)
