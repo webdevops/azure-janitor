@@ -1,4 +1,4 @@
-package main
+package janitor
 
 import (
 	"context"
@@ -14,13 +14,13 @@ func (j *Janitor) runDeployments(ctx context.Context, subscription subscriptions
 	var deploymentCounter, deploymentFinalCounter int64
 	contextLogger := log.WithField("task", "deployment")
 
-	client := resources.NewGroupsClientWithBaseURI(azureEnvironment.ResourceManagerEndpoint, *subscription.SubscriptionID)
-	client.Authorizer = azureAuthorizer
+	client := resources.NewGroupsClientWithBaseURI(j.Azure.Environment.ResourceManagerEndpoint, *subscription.SubscriptionID)
+	client.Authorizer = j.Azure.Authorizer
 
 	resourceTtl := prometheusCommon.NewMetricsList()
 
 	deploymentClient := resources.NewDeploymentsClient(*subscription.SubscriptionID)
-	deploymentClient.Authorizer = azureAuthorizer
+	deploymentClient.Authorizer = j.Azure.Authorizer
 
 	resourceType := "Microsoft.Resources/deployments"
 
@@ -44,30 +44,30 @@ func (j *Janitor) runDeployments(ctx context.Context, subscription subscriptions
 			deleteDeployment := false
 			deploymentCounter++
 
-			if deploymentCounter >= opts.Janitor.DeploymentsLimit {
+			if deploymentCounter >= j.Conf.Janitor.DeploymentsLimit {
 				// limit reached
 				deleteDeployment = true
 			} else if deployment.Properties != nil && deployment.Properties.Timestamp != nil {
 				// expire check
 				deploymentAge := time.Since(deployment.Properties.Timestamp.Time)
-				if deploymentAge.Seconds() > opts.Janitor.DeploymentsTtl.Seconds() {
+				if deploymentAge.Seconds() > j.Conf.Janitor.DeploymentsTtl.Seconds() {
 					deleteDeployment = true
 				}
 			}
 
-			if !opts.DryRun && deleteDeployment {
+			if !j.Conf.DryRun && deleteDeployment {
 				if _, err := deploymentClient.Delete(ctx, *resourceGroup.Name, *deployment.Name); err == nil {
 					// successfully deleted
 					resourceLogger.Infof("%s: successfully deleted", *deployment.ID)
 
-					Prometheus.MetricDeletedResource.With(prometheus.Labels{
+					j.Prometheus.MetricDeletedResource.With(prometheus.Labels{
 						"resourceType": resourceType,
 					}).Inc()
 				} else {
 					// failed delete
 					resourceLogger.Errorf("%s: ERROR %s", *deployment.ID, err)
 
-					Prometheus.MetricErrors.With(prometheus.Labels{
+					j.Prometheus.MetricErrors.With(prometheus.Labels{
 						"resourceType": resourceType,
 					}).Inc()
 				}

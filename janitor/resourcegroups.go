@@ -1,4 +1,4 @@
-package main
+package janitor
 
 import (
 	"context"
@@ -12,8 +12,8 @@ import (
 func (j *Janitor) runResourceGroups(ctx context.Context, subscription subscriptions.Subscription, filter string, ttlMetricsChan chan<- *prometheusCommon.MetricList) {
 	contextLogger := log.WithField("task", "resourceGroup")
 
-	client := resources.NewGroupsClientWithBaseURI(azureEnvironment.ResourceManagerEndpoint, *subscription.SubscriptionID)
-	client.Authorizer = azureAuthorizer
+	client := resources.NewGroupsClientWithBaseURI(j.Azure.Environment.ResourceManagerEndpoint, *subscription.SubscriptionID)
+	client.Authorizer = j.Azure.Authorizer
 
 	resourceTtl := prometheusCommon.NewMetricsList()
 
@@ -40,7 +40,7 @@ func (j *Janitor) runResourceGroups(ctx context.Context, subscription subscripti
 				}, *resourceExpiryTime)
 			}
 
-			if !opts.DryRun && resourceTagUpdateNeeded {
+			if !j.Conf.DryRun && resourceTagUpdateNeeded {
 				resourceLogger.Infof("tag update needed, updating resource")
 				resourceGroupOpts := resources.GroupPatchable{
 					Tags: resourceGroup.Tags,
@@ -53,26 +53,26 @@ func (j *Janitor) runResourceGroups(ctx context.Context, subscription subscripti
 					// failed delete
 					resourceLogger.Errorf("ERROR %s", err)
 
-					Prometheus.MetricErrors.With(prometheus.Labels{
+					j.Prometheus.MetricErrors.With(prometheus.Labels{
 						"resourceType": resourceType,
 					}).Inc()
 				}
 			}
 
-			if !opts.DryRun && resourceExpired {
+			if !j.Conf.DryRun && resourceExpired {
 				resourceLogger.Infof("expired, trying to delete")
 				if _, err := client.Delete(ctx, *resourceGroup.Name); err == nil {
 					// successfully deleted
 					resourceLogger.Infof("successfully deleted")
 
-					Prometheus.MetricDeletedResource.With(prometheus.Labels{
+					j.Prometheus.MetricDeletedResource.With(prometheus.Labels{
 						"resourceType": resourceType,
 					}).Inc()
 				} else {
 					// failed delete
 					resourceLogger.Errorf("ERROR %s", err)
 
-					Prometheus.MetricErrors.With(prometheus.Labels{
+					j.Prometheus.MetricErrors.With(prometheus.Labels{
 						"resourceType": resourceType,
 					}).Inc()
 				}

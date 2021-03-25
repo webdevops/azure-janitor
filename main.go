@@ -8,10 +8,10 @@ import (
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/azure/auth"
 	"github.com/jessevdk/go-flags"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
 	"github.com/webdevops/azure-janitor/config"
+	"github.com/webdevops/azure-janitor/janitor"
 	"net/http"
 	"os"
 	"path"
@@ -36,12 +36,6 @@ var (
 	gitCommit = "<unknown>"
 	gitTag    = "<unknown>"
 
-	Prometheus struct {
-		MetricDuration        *prometheus.GaugeVec
-		MetricTtlResources    *prometheus.GaugeVec
-		MetricDeletedResource *prometheus.CounterVec
-		MetricErrors          *prometheus.CounterVec
-	}
 )
 
 func main() {
@@ -52,7 +46,6 @@ func main() {
 
 	log.Infof("init Azure connection")
 	initAzureConnection()
-	initMetricCollector()
 
 	log.Infof("init Janitor")
 
@@ -74,7 +67,14 @@ func main() {
 		log.Infof("disabled Azure ResourceGroups Deployments cleanup")
 	}
 
-	j := Janitor{}
+	j := janitor.Janitor{
+		Conf: opts,
+		Azure: janitor.JanitorAzureConfig{
+			Authorizer: azureAuthorizer,
+			Subscriptions: azureSubscriptions,
+			Environment: azureEnvironment,
+		},
+	}
 	j.Init()
 	j.Run()
 
@@ -199,54 +199,6 @@ func initAzureConnection() {
 			azureSubscriptions = append(azureSubscriptions, result)
 		}
 	}
-}
-
-func initMetricCollector() {
-
-	Prometheus.MetricDuration = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "azurejanitor_duration",
-			Help: "AzureJanitor cleanup duration",
-		},
-		[]string{},
-	)
-
-	Prometheus.MetricTtlResources = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "azurejanitor_resources_ttl",
-			Help: "AzureJanitor number of resources with TTL",
-		},
-		[]string{
-			"resourceID",
-			"subscriptionID",
-			"resourceGroup",
-			"provider",
-		},
-	)
-
-	Prometheus.MetricDeletedResource = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "azurejanitor_resources_deleted",
-			Help: "AzureJanitor deleted resources",
-		},
-		[]string{
-			"resourceType",
-		},
-	)
-	Prometheus.MetricErrors = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "azurejanitor_errors",
-			Help: "AzureJanitor error counter",
-		},
-		[]string{
-			"resourceType",
-		},
-	)
-
-	prometheus.MustRegister(Prometheus.MetricDuration)
-	prometheus.MustRegister(Prometheus.MetricTtlResources)
-	prometheus.MustRegister(Prometheus.MetricDeletedResource)
-	prometheus.MustRegister(Prometheus.MetricErrors)
 }
 
 // start and handle prometheus handler

@@ -1,14 +1,17 @@
-package main
+package janitor
 
 import (
 	"context"
 	"fmt"
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/resources/mgmt/features"
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/resources/mgmt/subscriptions"
+	"github.com/Azure/go-autorest/autorest"
+	"github.com/Azure/go-autorest/autorest/azure"
 	tparse "github.com/karrick/tparse/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rickb777/date/period"
 	log "github.com/sirupsen/logrus"
+	"github.com/webdevops/azure-janitor/config"
 	prometheusCommon "github.com/webdevops/go-prometheus-common"
 	"strings"
 	"sync"
@@ -18,6 +21,22 @@ import (
 type (
 	Janitor struct {
 		apiVersionMap map[string]map[string]string
+
+		Conf  config.Opts
+		Azure JanitorAzureConfig
+
+		Prometheus struct {
+			MetricDuration        *prometheus.GaugeVec
+			MetricTtlResources    *prometheus.GaugeVec
+			MetricDeletedResource *prometheus.CounterVec
+			MetricErrors          *prometheus.CounterVec
+		}
+	}
+
+	JanitorAzureConfig struct {
+		Authorizer    autorest.Authorizer
+		Subscriptions []subscriptions.Subscription
+		Environment azure.Environment
 	}
 )
 
@@ -42,6 +61,51 @@ var (
 )
 
 func (j *Janitor) Init() {
+	j.Prometheus.MetricDuration = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "azurejanitor_duration",
+			Help: "AzureJanitor cleanup duration",
+		},
+		[]string{},
+	)
+	prometheus.MustRegister(j.Prometheus.MetricDuration)
+
+	j.Prometheus.MetricTtlResources = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "azurejanitor_resources_ttl",
+			Help: "AzureJanitor number of resources with TTL",
+		},
+		[]string{
+			"resourceID",
+			"subscriptionID",
+			"resourceGroup",
+			"provider",
+		},
+	)
+	prometheus.MustRegister(j.Prometheus.MetricTtlResources)
+
+	j.Prometheus.MetricDeletedResource = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "azurejanitor_resources_deleted",
+			Help: "AzureJanitor deleted resources",
+		},
+		[]string{
+			"resourceType",
+		},
+	)
+	prometheus.MustRegister(j.Prometheus.MetricDeletedResource)
+
+	j.Prometheus.MetricErrors = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "azurejanitor_errors",
+			Help: "AzureJanitor error counter",
+		},
+		[]string{
+			"resourceType",
+		},
+	)
+	prometheus.MustRegister(j.Prometheus.MetricErrors)
+
 	j.initAuzreApiVersions()
 }
 
@@ -58,20 +122,20 @@ func (j *Janitor) Run() {
 			callbackTtlMetrics := make(chan *prometheusCommon.MetricList)
 
 			// subscription processing
-			for _, subscription := range azureSubscriptions {
+			for _, subscription := range j.Azure.Subscriptions {
 				wgMain.Add(1)
 				go func(subscription subscriptions.Subscription) {
 					defer wgMain.Done()
 
-					if opts.Janitor.EnableResourceGroups {
-						j.runResourceGroups(ctx, subscription, opts.Janitor.FilterResourceGroups, callbackTtlMetrics)
+					if j.Conf.Janitor.EnableResourceGroups {
+						j.runResourceGroups(ctx, subscription, j.Conf.Janitor.FilterResourceGroups, callbackTtlMetrics)
 					}
 
-					if opts.Janitor.EnableResources {
-						j.runResources(ctx, subscription, opts.Janitor.FilterResources, callbackTtlMetrics)
+					if j.Conf.Janitor.EnableResources {
+						j.runResources(ctx, subscription, j.Conf.Janitor.FilterResources, callbackTtlMetrics)
 					}
 
-					if opts.Janitor.EnableDeployments {
+					if j.Conf.Janitor.EnableDeployments {
 						j.runDeployments(ctx, subscription, callbackTtlMetrics)
 					}
 				}(subscription)
@@ -91,9 +155,9 @@ func (j *Janitor) Run() {
 				}
 
 				// after channel is closed: reset metric and set them to the new state
-				Prometheus.MetricTtlResources.Reset()
+				j.Prometheus.MetricTtlResources.Reset()
 				for _, ttlMetrics := range ttlMetricListList {
-					ttlMetrics.GaugeSet(Prometheus.MetricTtlResources)
+					ttlMetrics.GaugeSet(j.Prometheus.MetricTtlResources)
 				}
 			}()
 
@@ -103,10 +167,10 @@ func (j *Janitor) Run() {
 			wgMetrics.Wait()
 
 			duration := time.Since(startTime)
-			Prometheus.MetricDuration.With(prometheus.Labels{}).Set(duration.Seconds())
+			j.Prometheus.MetricDuration.With(prometheus.Labels{}).Set(duration.Seconds())
 
-			log.WithField("duration", duration.Seconds()).Infof("finished run in %s, waiting %s", duration.String(), opts.Janitor.Interval.String())
-			time.Sleep(opts.Janitor.Interval)
+			log.WithField("duration", duration.Seconds()).Infof("finished run in %s, waiting %s", duration.String(), j.Conf.Janitor.Interval.String())
+			time.Sleep(j.Conf.Janitor.Interval)
 		}
 	}()
 }
@@ -115,9 +179,9 @@ func (j *Janitor) initAuzreApiVersions() {
 	ctx := context.Background()
 
 	j.apiVersionMap = map[string]map[string]string{}
-	for _, subscription := range azureSubscriptions {
+	for _, subscription := range j.Azure.Subscriptions {
 		client := features.NewProvidersClient(*subscription.SubscriptionID)
-		client.Authorizer = azureAuthorizer
+		client.Authorizer = j.Azure.Authorizer
 
 		subscriptionId := *subscription.SubscriptionID
 
@@ -180,7 +244,7 @@ func (j *Janitor) checkAzureResourceExpiry(logger *log.Entry, resourceType, reso
 	tagName, ttlValue := j.getTtlTagFromAzureResoruce(*resourceTags)
 
 	if ttlValue != nil {
-		if opts.Logger.Verbose {
+		if j.Conf.Logger.Verbose {
 			logger.Infof("checking ttl")
 		}
 
@@ -188,13 +252,13 @@ func (j *Janitor) checkAzureResourceExpiry(logger *log.Entry, resourceType, reso
 		if timeParseErr == nil {
 			// date parsed successfully
 			if tagValueExpired {
-				if opts.DryRun {
+				if j.Conf.DryRun {
 					logger.Infof("expired, but dryrun active")
 				} else {
 					resourceExpired = true
 				}
 			} else {
-				if opts.Logger.Verbose {
+				if j.Conf.Logger.Verbose {
 					logger.Infof("NOT expired")
 				}
 			}
@@ -216,7 +280,7 @@ func (j *Janitor) checkAzureResourceExpiry(logger *log.Entry, resourceType, reso
 
 func (j *Janitor) getTtlTagFromAzureResoruce(tags map[string]*string) (ttlName, ttlValue *string) {
 	for tagName, tagValue := range tags {
-		if tagName == opts.Janitor.Tag && tagValue != nil && *tagValue != "" {
+		if tagName == j.Conf.Janitor.Tag && tagValue != nil && *tagValue != "" {
 			val := tagName
 			ttlName = &val
 			ttlValue = tagValue
