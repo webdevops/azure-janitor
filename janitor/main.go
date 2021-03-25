@@ -36,7 +36,7 @@ type (
 	JanitorAzureConfig struct {
 		Authorizer    autorest.Authorizer
 		Subscriptions []subscriptions.Subscription
-		Environment azure.Environment
+		Environment   azure.Environment
 	}
 )
 
@@ -73,7 +73,7 @@ func (j *Janitor) Init() {
 	j.Prometheus.MetricTtlResources = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "azurejanitor_resources_ttl",
-			Help: "AzureJanitor number of resources with TTL",
+			Help: "AzureJanitor resources with expiry time",
 		},
 		[]string{
 			"resourceID",
@@ -84,12 +84,30 @@ func (j *Janitor) Init() {
 	)
 	prometheus.MustRegister(j.Prometheus.MetricTtlResources)
 
+	j.Prometheus.MetricTtlResources = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "azurejanitor_roleassignment_ttl",
+			Help: "AzureJanitor roleassignments with expiry time",
+		},
+		[]string{
+			"roleAssignmentId",
+			"scope",
+			"principalId",
+			"principalType",
+			"roleDefinitionId",
+			"subscriptionID",
+			"resourceGroup",
+		},
+	)
+	prometheus.MustRegister(j.Prometheus.MetricTtlResources)
+
 	j.Prometheus.MetricDeletedResource = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "azurejanitor_resources_deleted",
 			Help: "AzureJanitor deleted resources",
 		},
 		[]string{
+			"subscriptionID",
 			"resourceType",
 		},
 	)
@@ -101,6 +119,7 @@ func (j *Janitor) Init() {
 			Help: "AzureJanitor error counter",
 		},
 		[]string{
+			"subscriptionID",
 			"resourceType",
 		},
 	)
@@ -127,16 +146,20 @@ func (j *Janitor) Run() {
 				go func(subscription subscriptions.Subscription) {
 					defer wgMain.Done()
 
-					if j.Conf.Janitor.EnableResourceGroups {
-						j.runResourceGroups(ctx, subscription, j.Conf.Janitor.FilterResourceGroups, callbackTtlMetrics)
+					if j.Conf.Janitor.ResourceGroups.Enable {
+						j.runResourceGroups(ctx, subscription, j.Conf.Janitor.ResourceGroups.Filter, callbackTtlMetrics)
 					}
 
-					if j.Conf.Janitor.EnableResources {
-						j.runResources(ctx, subscription, j.Conf.Janitor.FilterResources, callbackTtlMetrics)
+					if j.Conf.Janitor.Resources.Enable {
+						j.runResources(ctx, subscription, j.Conf.Janitor.Resources.Filter, callbackTtlMetrics)
 					}
 
-					if j.Conf.Janitor.EnableDeployments {
+					if j.Conf.Janitor.Deployments.Enable {
 						j.runDeployments(ctx, subscription, callbackTtlMetrics)
+					}
+
+					if j.Conf.Janitor.RoleAssignments.Enable {
+						j.runRoleAssignments(ctx, subscription, j.Conf.Janitor.RoleAssignments.Filter, callbackTtlMetrics)
 					}
 				}(subscription)
 			}

@@ -35,7 +35,6 @@ var (
 	// Git version information
 	gitCommit = "<unknown>"
 	gitTag    = "<unknown>"
-
 )
 
 func main() {
@@ -48,31 +47,12 @@ func main() {
 	initAzureConnection()
 
 	log.Infof("init Janitor")
-
-	if opts.Janitor.EnableResourceGroups {
-		log.Infof("enabled Azure ResourceGroups cleanup (filter: %s)", opts.Janitor.FilterResourceGroups)
-	} else {
-		log.Infof("disabled Azure ResourceGroups cleanup")
-	}
-
-	if opts.Janitor.EnableResources {
-		log.Infof("enabled Azure Resources cleanup (filter: %s)", opts.Janitor.FilterResources)
-	} else {
-		log.Infof("disabled Azure Resources cleanup")
-	}
-
-	if opts.Janitor.EnableDeployments {
-		log.Infof("enabled Azure ResourceGroups Deployments cleanup (limit: %v, ttl: %v)", opts.Janitor.DeploymentsLimit, opts.Janitor.DeploymentsTtl.String())
-	} else {
-		log.Infof("disabled Azure ResourceGroups Deployments cleanup")
-	}
-
 	j := janitor.Janitor{
 		Conf: opts,
 		Azure: janitor.JanitorAzureConfig{
-			Authorizer: azureAuthorizer,
+			Authorizer:    azureAuthorizer,
 			Subscriptions: azureSubscriptions,
-			Environment: azureEnvironment,
+			Environment:   azureEnvironment,
 		},
 	}
 	j.Init()
@@ -84,7 +64,6 @@ func main() {
 
 // init argparser and parse/validate arguments
 func initArgparser() {
-
 	argparser = flags.NewParser(&opts, flags.Default)
 	_, err := argparser.Parse()
 
@@ -131,30 +110,62 @@ func initArgparser() {
 	}
 
 	// resourceGroup filter
-	opts.Janitor.FilterResourceGroups = fmt.Sprintf(
+	opts.Janitor.ResourceGroups.Filter = fmt.Sprintf(
 		"tagName eq '%s'",
 		strings.Replace(opts.Janitor.Tag, "'", "\\'", -1),
 	)
 
-	// add additional filter
-	if opts.Janitor.AdditionalFilterResourceGroups != nil {
-		opts.Janitor.FilterResourceGroups = fmt.Sprintf(
+	// ResourceGroups: add additional filter
+	if opts.Janitor.ResourceGroups.AdditionalFilter != nil {
+		opts.Janitor.ResourceGroups.Filter = fmt.Sprintf(
 			"%s and %s",
-			opts.Janitor.FilterResourceGroups,
-			*opts.Janitor.AdditionalFilterResourceGroups,
+			opts.Janitor.ResourceGroups.Filter,
+			*opts.Janitor.ResourceGroups.AdditionalFilter,
 		)
 	}
 
+	// Resources: add additional filter
 	// resource (if we specify tagValue here we don't get the tag.. wtf?!)
-	opts.Janitor.FilterResources = ""
-
-	// add additional filter
-	if opts.Janitor.AdditionalFilterResources != nil {
-		opts.Janitor.FilterResources = *opts.Janitor.AdditionalFilterResources
+	opts.Janitor.Resources.Filter = ""
+	if opts.Janitor.Resources.AdditionalFilter != nil {
+		opts.Janitor.Resources.Filter = *opts.Janitor.Resources.AdditionalFilter
 	}
 
-	if !opts.Janitor.EnableResourceGroups && !opts.Janitor.EnableResources && !opts.Janitor.EnableDeployments {
-		log.Fatal("no janitor task (resources, resourcegroups, deployments) enabled, not starting")
+	if opts.Janitor.RoleAssignments.Enable {
+		if len(opts.Janitor.RoleAssignments.RoleDefintionIds) == 0 {
+			log.Panic("roleAssignment janitor active but no roleDefinitionIds defined")
+		}
+	}
+
+	// RoleAssignments: add additional filter
+	if opts.Janitor.RoleAssignments.AdditionalFilter != nil {
+		opts.Janitor.RoleAssignments.Filter = *opts.Janitor.RoleAssignments.AdditionalFilter
+	}
+
+	if !opts.Janitor.ResourceGroups.Enable && !opts.Janitor.Resources.Enable && !opts.Janitor.Deployments.Enable && !opts.Janitor.RoleAssignments.Enable {
+		log.Fatal("no janitor task (resources, resourcegroups, deployments, roleassignments) enabled, not starting")
+	}
+
+	checkForDeprecations()
+}
+
+func checkForDeprecations() {
+	deprecatedEnvVars := map[string]string{
+		`JANITOR_ENABLE_DEPLOYMENTS`: `use env "JANITOR_DEPLOYMENTS_ENABLE" instead`,
+		`JANITOR_DEPLOYMENT_TTL`: `use env "JANITOR_DEPLOYMENTS_TTL" instead`,
+		`JANITOR_DEPLOYMENT_LIMIT`: `use env "JANITOR_DEPLOYMENTS_LIMIT" instead`,
+
+		`JANITOR_ENABLE_RESOURCEGROUPS`: `use env "JANITOR_RESOURCEGROUPS_ENABLE" instead`,
+		`JANITOR_FILTER_RESOURCEGROUPS`: `use env "JANITOR_RESOURCEGROUPS_FILTER" instead`,
+
+		`JANITOR_ENABLE_RESOURCES`: `use env "JANITOR_RESOURCES_ENABLE" instead`,
+		`JANITOR_FILTER_RESOURCES`: `use env "JANITOR_RESOURCES_FILTER" instead`,
+	}
+
+	for envVar, solution := range deprecatedEnvVars {
+		if val := os.Getenv(envVar); val != "" {
+			log.Panicf(`unsupported environment variable "%v" detected: %v`, envVar, solution)
+		}
 	}
 }
 

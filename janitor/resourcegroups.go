@@ -66,6 +66,7 @@ func (j *Janitor) runResourceGroups(ctx context.Context, subscription subscripti
 					resourceLogger.Infof("successfully deleted")
 
 					j.Prometheus.MetricDeletedResource.With(prometheus.Labels{
+						"subscriptionID": *subscription.SubscriptionID,
 						"resourceType": resourceType,
 					}).Inc()
 				} else {
@@ -73,6 +74,7 @@ func (j *Janitor) runResourceGroups(ctx context.Context, subscription subscripti
 					resourceLogger.Errorf("ERROR %s", err)
 
 					j.Prometheus.MetricErrors.With(prometheus.Labels{
+						"subscriptionID": *subscription.SubscriptionID,
 						"resourceType": resourceType,
 					}).Inc()
 				}

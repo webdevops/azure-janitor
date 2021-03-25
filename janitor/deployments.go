@@ -44,13 +44,13 @@ func (j *Janitor) runDeployments(ctx context.Context, subscription subscriptions
 			deleteDeployment := false
 			deploymentCounter++
 
-			if deploymentCounter >= j.Conf.Janitor.DeploymentsLimit {
+			if deploymentCounter >= j.Conf.Janitor.Deployments.Limit {
 				// limit reached
 				deleteDeployment = true
 			} else if deployment.Properties != nil && deployment.Properties.Timestamp != nil {
 				// expire check
 				deploymentAge := time.Since(deployment.Properties.Timestamp.Time)
-				if deploymentAge.Seconds() > j.Conf.Janitor.DeploymentsTtl.Seconds() {
+				if deploymentAge.Seconds() > j.Conf.Janitor.Deployments.Ttl.Seconds() {
 					deleteDeployment = true
 				}
 			}
@@ -61,6 +61,7 @@ func (j *Janitor) runDeployments(ctx context.Context, subscription subscriptions
 					resourceLogger.Infof("%s: successfully deleted", *deployment.ID)
 
 					j.Prometheus.MetricDeletedResource.With(prometheus.Labels{
+						"subscriptionID": *subscription.SubscriptionID,
 						"resourceType": resourceType,
 					}).Inc()
 				} else {
@@ -68,6 +69,7 @@ func (j *Janitor) runDeployments(ctx context.Context, subscription subscriptions
 					resourceLogger.Errorf("%s: ERROR %s", *deployment.ID, err)
 
 					j.Prometheus.MetricErrors.With(prometheus.Labels{
+						"subscriptionID": *subscription.SubscriptionID,
 						"resourceType": resourceType,
 					}).Inc()
 				}
