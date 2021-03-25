@@ -26,8 +26,9 @@ type (
 		// janitor
 		Janitor struct {
 			// Janitor settings
-			Interval time.Duration `long:"janitor.interval" env:"JANITOR_INTERVAL"  description:"Janitor interval (time.duration)"  default:"1h"`
-			Tag      string        `long:"janitor.tag"      env:"JANITOR_TAG"  description:"Janitor azure tag (string)"  default:"ttl"`
+			Interval  time.Duration `long:"janitor.interval"    env:"JANITOR_INTERVAL"    description:"Janitor interval (time.duration)"  default:"1h"`
+			Tag       string        `long:"janitor.tag"         env:"JANITOR_TAG"         description:"Janitor azure tag (string)"  default:"ttl"`
+			TagTarget string        `long:"janitor.tag.target"  env:"JANITOR_TAG_TARGET"  description:"Janitor azure tag (string)"  default:"ttl_expiry"`
 
 			ResourceGroups struct {
 				Enable           bool    `long:"janitor.resourcegroups.enable"  env:"JANITOR_RESOURCEGROUPS_ENABLE"  description:"Enable Azure ResourceGroups cleanup"`

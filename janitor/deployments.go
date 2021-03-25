@@ -62,7 +62,7 @@ func (j *Janitor) runDeployments(ctx context.Context, subscription subscriptions
 
 					j.Prometheus.MetricDeletedResource.With(prometheus.Labels{
 						"subscriptionID": *subscription.SubscriptionID,
-						"resourceType": resourceType,
+						"resourceType":   resourceType,
 					}).Inc()
 				} else {
 					// failed delete
@@ -70,7 +70,7 @@ func (j *Janitor) runDeployments(ctx context.Context, subscription subscriptions
 
 					j.Prometheus.MetricErrors.With(prometheus.Labels{
 						"subscriptionID": *subscription.SubscriptionID,
-						"resourceType": resourceType,
+						"resourceType":   resourceType,
 					}).Inc()
 				}
 			} else {

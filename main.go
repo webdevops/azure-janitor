@@ -152,8 +152,8 @@ func initArgparser() {
 func checkForDeprecations() {
 	deprecatedEnvVars := map[string]string{
 		`JANITOR_ENABLE_DEPLOYMENTS`: `use env "JANITOR_DEPLOYMENTS_ENABLE" instead`,
-		`JANITOR_DEPLOYMENT_TTL`: `use env "JANITOR_DEPLOYMENTS_TTL" instead`,
-		`JANITOR_DEPLOYMENT_LIMIT`: `use env "JANITOR_DEPLOYMENTS_LIMIT" instead`,
+		`JANITOR_DEPLOYMENT_TTL`:     `use env "JANITOR_DEPLOYMENTS_TTL" instead`,
+		`JANITOR_DEPLOYMENT_LIMIT`:   `use env "JANITOR_DEPLOYMENTS_LIMIT" instead`,
 
 		`JANITOR_ENABLE_RESOURCEGROUPS`: `use env "JANITOR_RESOURCEGROUPS_ENABLE" instead`,
 		`JANITOR_FILTER_RESOURCEGROUPS`: `use env "JANITOR_RESOURCEGROUPS_FILTER" instead`,

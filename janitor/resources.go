@@ -56,7 +56,7 @@ func (j *Janitor) runResources(ctx context.Context, subscription subscriptions.S
 
 					j.Prometheus.MetricErrors.With(prometheus.Labels{
 						"subscriptionID": *subscription.SubscriptionID,
-						"resourceType": resourceType,
+						"resourceType":   resourceType,
 					}).Inc()
 				}
 			}
@@ -69,7 +69,7 @@ func (j *Janitor) runResources(ctx context.Context, subscription subscriptions.S
 
 					j.Prometheus.MetricDeletedResource.With(prometheus.Labels{
 						"subscriptionID": *subscription.SubscriptionID,
-						"resourceType": resourceType,
+						"resourceType":   resourceType,
 					}).Inc()
 				} else {
 					// failed delete
@@ -77,7 +77,7 @@ func (j *Janitor) runResources(ctx context.Context, subscription subscriptions.S
 
 					j.Prometheus.MetricErrors.With(prometheus.Labels{
 						"subscriptionID": *subscription.SubscriptionID,
-						"resourceType": resourceType,
+						"resourceType":   resourceType,
 					}).Inc()
 				}
 			}

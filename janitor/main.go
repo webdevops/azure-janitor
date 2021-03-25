@@ -26,10 +26,11 @@ type (
 		Azure JanitorAzureConfig
 
 		Prometheus struct {
-			MetricDuration        *prometheus.GaugeVec
-			MetricTtlResources    *prometheus.GaugeVec
-			MetricDeletedResource *prometheus.CounterVec
-			MetricErrors          *prometheus.CounterVec
+			MetricDuration           *prometheus.GaugeVec
+			MetricTtlResources       *prometheus.GaugeVec
+			MetricTtlRoleAssignments *prometheus.GaugeVec
+			MetricDeletedResource    *prometheus.CounterVec
+			MetricErrors             *prometheus.CounterVec
 		}
 	}
 
@@ -84,7 +85,7 @@ func (j *Janitor) Init() {
 	)
 	prometheus.MustRegister(j.Prometheus.MetricTtlResources)
 
-	j.Prometheus.MetricTtlResources = prometheus.NewGaugeVec(
+	j.Prometheus.MetricTtlRoleAssignments = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "azurejanitor_roleassignment_ttl",
 			Help: "AzureJanitor roleassignments with expiry time",
@@ -99,7 +100,7 @@ func (j *Janitor) Init() {
 			"resourceGroup",
 		},
 	)
-	prometheus.MustRegister(j.Prometheus.MetricTtlResources)
+	prometheus.MustRegister(j.Prometheus.MetricTtlRoleAssignments)
 
 	j.Prometheus.MetricDeletedResource = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
@@ -138,7 +139,8 @@ func (j *Janitor) Run() {
 			var wgMain sync.WaitGroup
 			var wgMetrics sync.WaitGroup
 
-			callbackTtlMetrics := make(chan *prometheusCommon.MetricList)
+			callbackTtlResourcesMetrics := make(chan *prometheusCommon.MetricList)
+			callbackTtlRoleAssignmentsMetrics := make(chan *prometheusCommon.MetricList)
 
 			// subscription processing
 			for _, subscription := range j.Azure.Subscriptions {
@@ -147,19 +149,19 @@ func (j *Janitor) Run() {
 					defer wgMain.Done()
 
 					if j.Conf.Janitor.ResourceGroups.Enable {
-						j.runResourceGroups(ctx, subscription, j.Conf.Janitor.ResourceGroups.Filter, callbackTtlMetrics)
+						j.runResourceGroups(ctx, subscription, j.Conf.Janitor.ResourceGroups.Filter, callbackTtlResourcesMetrics)
 					}
 
 					if j.Conf.Janitor.Resources.Enable {
-						j.runResources(ctx, subscription, j.Conf.Janitor.Resources.Filter, callbackTtlMetrics)
+						j.runResources(ctx, subscription, j.Conf.Janitor.Resources.Filter, callbackTtlResourcesMetrics)
 					}
 
 					if j.Conf.Janitor.Deployments.Enable {
-						j.runDeployments(ctx, subscription, callbackTtlMetrics)
+						j.runDeployments(ctx, subscription, callbackTtlResourcesMetrics)
 					}
 
 					if j.Conf.Janitor.RoleAssignments.Enable {
-						j.runRoleAssignments(ctx, subscription, j.Conf.Janitor.RoleAssignments.Filter, callbackTtlMetrics)
+						j.runRoleAssignments(ctx, subscription, j.Conf.Janitor.RoleAssignments.Filter, callbackTtlRoleAssignmentsMetrics)
 					}
 				}(subscription)
 			}
@@ -171,7 +173,26 @@ func (j *Janitor) Run() {
 
 				// store metriclists from channel
 				ttlMetricListList := []prometheusCommon.MetricList{}
-				for ttlMetrics := range callbackTtlMetrics {
+				for ttlMetrics := range callbackTtlRoleAssignmentsMetrics {
+					if ttlMetrics != nil {
+						ttlMetricListList = append(ttlMetricListList, *ttlMetrics)
+					}
+				}
+
+				// after channel is closed: reset metric and set them to the new state
+				j.Prometheus.MetricTtlRoleAssignments.Reset()
+				for _, ttlMetrics := range ttlMetricListList {
+					ttlMetrics.GaugeSet(j.Prometheus.MetricTtlRoleAssignments)
+				}
+			}()
+
+			wgMetrics.Add(1)
+			go func() {
+				defer wgMetrics.Done()
+
+				// store metriclists from channel
+				ttlMetricListList := []prometheusCommon.MetricList{}
+				for ttlMetrics := range callbackTtlResourcesMetrics {
 					if ttlMetrics != nil {
 						ttlMetricListList = append(ttlMetricListList, *ttlMetrics)
 					}
@@ -186,7 +207,8 @@ func (j *Janitor) Run() {
 
 			// wait for subscription main func, then close channel and wait for metrics
 			wgMain.Wait()
-			close(callbackTtlMetrics)
+			close(callbackTtlResourcesMetrics)
+			close(callbackTtlRoleAssignmentsMetrics)
 			wgMetrics.Wait()
 
 			duration := time.Since(startTime)
@@ -264,7 +286,7 @@ func (j *Janitor) getAzureApiVersionForSubscriptionResourceType(subscriptionId, 
 }
 
 func (j *Janitor) checkAzureResourceExpiry(logger *log.Entry, resourceType, resourceId string, resourceTags *map[string]*string) (resourceExpireTime *time.Time, resourceExpired bool, resourceTagRewriteNeeded bool) {
-	tagName, ttlValue := j.getTtlTagFromAzureResoruce(*resourceTags)
+	ttlValue := j.getTtlTagFromAzureResoruce(*resourceTags)
 
 	if ttlValue != nil {
 		if j.Conf.Logger.Verbose {
@@ -292,7 +314,7 @@ func (j *Janitor) checkAzureResourceExpiry(logger *log.Entry, resourceType, reso
 			logger.Infof("found valid duration (%v)", *ttlValue)
 			resourceTagRewriteNeeded = true
 			ttlValue := val.Format(time.RFC3339)
-			(*resourceTags)[*tagName] = &ttlValue
+			(*resourceTags)[j.Conf.Janitor.TagTarget] = &ttlValue
 		} else {
 			logger.Errorf("ERROR %s", timeParseErr)
 		}
@@ -301,20 +323,25 @@ func (j *Janitor) checkAzureResourceExpiry(logger *log.Entry, resourceType, reso
 	return
 }
 
-func (j *Janitor) getTtlTagFromAzureResoruce(tags map[string]*string) (ttlName, ttlValue *string) {
+func (j *Janitor) getTtlTagFromAzureResoruce(tags map[string]*string) *string {
+	// check target tag first
 	for tagName, tagValue := range tags {
-		if tagName == j.Conf.Janitor.Tag && tagValue != nil && *tagValue != "" {
-			val := tagName
-			ttlName = &val
-			ttlValue = tagValue
+		if tagName == j.Conf.Janitor.TagTarget && tagValue != nil && *tagValue != "" {
+			return tagValue
 		}
 	}
 
-	return
+	// check source tag last
+	for tagName, tagValue := range tags {
+		if tagName == j.Conf.Janitor.Tag && tagValue != nil && *tagValue != "" {
+			return tagValue
+		}
+	}
+
+	return nil
 }
 
 func (j *Janitor) checkExpiryDuration(value string) (parsedTime *time.Time, err error) {
-
 	// sanity checks
 	value = strings.TrimSpace(value)
 	if value == "" {

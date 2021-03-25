@@ -11,6 +11,7 @@ import (
 
 func (j *Janitor) runResourceGroups(ctx context.Context, subscription subscriptions.Subscription, filter string, ttlMetricsChan chan<- *prometheusCommon.MetricList) {
 	contextLogger := log.WithField("task", "resourceGroup")
+	resourceType := "Microsoft.Resources/resourceGroups"
 
 	client := resources.NewGroupsClientWithBaseURI(j.Azure.Environment.ResourceManagerEndpoint, *subscription.SubscriptionID)
 	client.Authorizer = j.Azure.Authorizer
@@ -23,9 +24,6 @@ func (j *Janitor) runResourceGroups(ctx context.Context, subscription subscripti
 	}
 
 	for _, resourceGroup := range *resourceGroupResult.Response().Value {
-		// resourceGroup.Type is nil
-		resourceType := "Microsoft.Resources/resourceGroups"
-
 		resourceLogger := contextLogger.WithField("resource", *resourceGroup.ID)
 
 		if resourceGroup.Tags != nil {
@@ -67,7 +65,7 @@ func (j *Janitor) runResourceGroups(ctx context.Context, subscription subscripti
 
 					j.Prometheus.MetricDeletedResource.With(prometheus.Labels{
 						"subscriptionID": *subscription.SubscriptionID,
-						"resourceType": resourceType,
+						"resourceType":   resourceType,
 					}).Inc()
 				} else {
 					// failed delete
@@ -75,7 +73,7 @@ func (j *Janitor) runResourceGroups(ctx context.Context, subscription subscripti
 
 					j.Prometheus.MetricErrors.With(prometheus.Labels{
 						"subscriptionID": *subscription.SubscriptionID,
-						"resourceType": resourceType,
+						"resourceType":   resourceType,
 					}).Inc()
 				}
 			}

@@ -14,7 +14,7 @@ func (j *Janitor) runRoleAssignments(ctx context.Context, subscription subscript
 	contextLogger := log.WithField("task", "roleAssignment")
 
 	resourceTtl := prometheusCommon.NewMetricsList()
-	resourceType := "roleAssignment"
+	resourceType := "Microsoft.Authorization/roleAssignments"
 
 	client := authorization.NewRoleAssignmentsClientWithBaseURI(j.Azure.Environment.ResourceManagerEndpoint, *subscription.SubscriptionID)
 	client.Authorizer = j.Azure.Authorizer
@@ -66,7 +66,7 @@ func (j *Janitor) runRoleAssignments(ctx context.Context, subscription subscript
 
 						j.Prometheus.MetricDeletedResource.With(prometheus.Labels{
 							"subscriptionID": *subscription.SubscriptionID,
-							"resourceType": resourceType,
+							"resourceType":   resourceType,
 						}).Inc()
 					} else {
 						// failed delete
@@ -74,7 +74,7 @@ func (j *Janitor) runRoleAssignments(ctx context.Context, subscription subscript
 
 						j.Prometheus.MetricErrors.With(prometheus.Labels{
 							"subscriptionID": *subscription.SubscriptionID,
-							"resourceType": resourceType,
+							"resourceType":   resourceType,
 						}).Inc()
 					}
 				} else {
