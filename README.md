@@ -30,10 +30,10 @@ Application Options:
       --janitor.interval=                         Janitor interval (time.duration) (default: 1h) [$JANITOR_INTERVAL]
       --janitor.tag=                              Janitor azure tag (string) (default: ttl) [$JANITOR_TAG]
       --janitor.tag.target=                       Janitor azure tag (string) (default: ttl_expiry) [$JANITOR_TAG_TARGET]
-      --janitor.resourcegroups.enable             Enable Azure ResourceGroups cleanup [$JANITOR_RESOURCEGROUPS_ENABLE]
+      --janitor.resourcegroups                    Enable Azure ResourceGroups cleanup [$JANITOR_RESOURCEGROUPS_ENABLE]
       --janitor.resourcegroups.filter=            Additional $filter for Azure REST API for ResourceGroups
                                                   [$JANITOR_RESOURCEGROUPS_FILTER]
-      --janitor.resources.enable                  Enable Azure Resources cleanup [$JANITOR_RESOURCES_ENABLE]
+      --janitor.resources                         Enable Azure Resources cleanup [$JANITOR_RESOURCES_ENABLE]
       --janitor.resources.filter=                 Additional $filter for Azure REST API for Resources
                                                   [$JANITOR_RESOURCES_FILTER]
       --janitor.deployments                       Enable Azure Deployments cleanup [$JANITOR_DEPLOYMENTS_ENABLE]
@@ -41,12 +41,11 @@ Application Options:
                                                   [$JANITOR_DEPLOYMENTS_TTL]
       --janitor.deployments.limit=                Janitor deployment limit count (int) (default: 700)
                                                   [$JANITOR_DEPLOYMENTS_LIMIT]
-      --janitor.roleassignments.enable            Enable Azure RoleAssignments cleanup [$JANITOR_ROLEASSIGNMENTS_ENABLE]
+      --janitor.roleassignments                   Enable Azure RoleAssignments cleanup [$JANITOR_ROLEASSIGNMENTS_ENABLE]
       --janitor.roleassignments.ttl=              Janitor roleassignment ttl (time.duration) (default: 6h)
                                                   [$JANITOR_ROLEASSIGNMENTS_TTL]
       --janitor.roleassignments.roledefinitionid= Janitor roledefinition ID (eg:
                                                   /subscriptions/xxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx/providers/Microsoft.Author-
-
                                                   ization/roleDefinitions/xxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx)
                                                   [$JANITOR_ROLEASSIGNMENTS_ROLEDEFINITIONID]
       --janitor.roleassignments.filter=           Additional $filter for Azure REST API for RoleAssignments
@@ -101,7 +100,7 @@ To cleanup Azure RoleAssignments a list of Azure RoleDefinitions (multiple possi
 
 ```
 /azure-janitor \
-    --janitor.roleassignments.enable \
+    --janitor.roleassignments \
     --janitor.roleassignments.roledefinitionid=/subscriptions/xxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx/providers/Microsoft.Authorization/roleDefinitions/xxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx \
     --janitor.roleassignments.roledefinitionid=/subscriptions/xxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx/providers/Microsoft.Authorization/roleDefinitions/xxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx \
     --janitor.roleassignments.roledefinitionid=/subscriptions/xxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx/providers/Microsoft.Authorization/roleDefinitions/xxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx \
@@ -110,6 +109,85 @@ To cleanup Azure RoleAssignments a list of Azure RoleDefinitions (multiple possi
 
 This can be used for cleanup of temporary RoleAssignments.
 Expiry time is calculated based on Azure RoleAssignment creation time and specified TTL.
+
+ARM template usage
+------------------
+
+Using relative time (duration):
+```
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    // ...
+  },
+  "variables": {
+    "tags": {
+      "ttl": "1mo"
+    }
+  },
+  "resources": [
+    // ...
+    {
+      "name": "foobar",
+      "type": "Microsoft.KeyVault/vaults",
+      "apiVersion": "2018-02-14",
+      "location": "westeurope",
+      "tags": "[variables('tags')]",
+      "properties": {
+        // ...
+      }
+    }
+    // ...
+  ],
+  "outputs": {
+    "tags": {
+      "value": "[variables('tags')]",
+      "type": "object"
+    }
+  }
+}
+```
+
+Using absolute calculated time:
+```
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "baseTime": {
+      "type": "string",
+      "defaultValue": "[utcNow('u')]"
+    }
+  },
+  "variables": {
+    "tags": {
+      "ttl": "[dateTimeAdd(parameters('baseTime'), 'P1M')]"
+    }
+  },
+  "resources": [
+    // ...
+    {
+      "name": "foobar",
+      "type": "Microsoft.KeyVault/vaults",
+      "apiVersion": "2018-02-14",
+      "location": "westeurope",
+      "tags": "[variables('tags')]",
+      "properties": {
+        // ...
+      }
+    }
+    // ...
+  ],
+  "outputs": {
+    "tags": {
+      "value": "[variables('tags')]",
+      "type": "object"
+    }
+  }
+}
+
+```
 
 Metrics
 -------
