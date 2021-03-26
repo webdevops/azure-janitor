@@ -312,9 +312,11 @@ func (j *Janitor) checkAzureResourceExpiry(logger *log.Entry, resourceType, reso
 		} else if val, durationParseErr := j.checkExpiryDuration(*ttlValue); durationParseErr == nil && val != nil {
 			// try parse as duration
 			logger.Infof("found valid duration (%v)", *ttlValue)
-			resourceTagRewriteNeeded = true
 			ttlValue := val.Format(time.RFC3339)
 			(*resourceTags)[j.Conf.Janitor.TagTarget] = &ttlValue
+
+			resourceTagRewriteNeeded = true
+			resourceExpireTime = val
 		} else {
 			logger.Errorf("ERROR %s", timeParseErr)
 		}

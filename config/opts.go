@@ -31,13 +31,13 @@ type (
 			TagTarget string        `long:"janitor.tag.target"  env:"JANITOR_TAG_TARGET"  description:"Janitor azure tag (string)"  default:"ttl_expiry"`
 
 			ResourceGroups struct {
-				Enable           bool    `long:"janitor.resourcegroups.enable"  env:"JANITOR_RESOURCEGROUPS_ENABLE"  description:"Enable Azure ResourceGroups cleanup"`
+				Enable           bool    `long:"janitor.resourcegroups"         env:"JANITOR_RESOURCEGROUPS_ENABLE"  description:"Enable Azure ResourceGroups cleanup"`
 				AdditionalFilter *string `long:"janitor.resourcegroups.filter"  env:"JANITOR_RESOURCEGROUPS_FILTER"  description:"Additional $filter for Azure REST API for ResourceGroups"`
 				Filter           string
 			}
 
 			Resources struct {
-				Enable           bool    `long:"janitor.resources.enable"   env:"JANITOR_RESOURCES_ENABLE"  description:"Enable Azure Resources cleanup"`
+				Enable           bool    `long:"janitor.resources"          env:"JANITOR_RESOURCES_ENABLE"  description:"Enable Azure Resources cleanup"`
 				AdditionalFilter *string `long:"janitor.resources.filter"   env:"JANITOR_RESOURCES_FILTER"  description:"Additional $filter for Azure REST API for Resources"`
 				Filter           string
 			}
@@ -49,7 +49,7 @@ type (
 			}
 
 			RoleAssignments struct {
-				Enable           bool          `long:"janitor.roleassignments.enable"             env:"JANITOR_ROLEASSIGNMENTS_ENABLE"  description:"Enable Azure RoleAssignments cleanup"`
+				Enable           bool          `long:"janitor.roleassignments"                    env:"JANITOR_ROLEASSIGNMENTS_ENABLE"  description:"Enable Azure RoleAssignments cleanup"`
 				Ttl              time.Duration `long:"janitor.roleassignments.ttl"                env:"JANITOR_ROLEASSIGNMENTS_TTL"  description:"Janitor roleassignment ttl (time.duration)"  default:"6h"`
 				RoleDefintionIds []string      `long:"janitor.roleassignments.roledefinitionid"   env:"JANITOR_ROLEASSIGNMENTS_ROLEDEFINITIONID"  env-delim:" " description:"Janitor roledefinition ID (eg: /subscriptions/xxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx/providers/Microsoft.Authorization/roleDefinitions/xxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx)"`
 				AdditionalFilter *string       `long:"janitor.roleassignments.filter"             env:"JANITOR_ROLEASSIGNMENTS_FILTER"  description:"Additional $filter for Azure REST API for RoleAssignments"`

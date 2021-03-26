@@ -45,7 +45,7 @@ func (j *Janitor) runRoleAssignments(ctx context.Context, subscription subscript
 			}
 
 			roleAssignmentExpiry := roleAssignment.CreatedOn.UTC().Add(j.Conf.Janitor.RoleAssignments.Ttl)
-			roleAssignmentExpired := roleAssignmentExpiry.Before(time.Now())
+			roleAssignmentExpired := time.Now().After(roleAssignmentExpiry)
 
 			resourceTtl.AddTime(prometheus.Labels{
 				"roleAssignmentId": *roleAssignment.ID,
