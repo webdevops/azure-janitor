@@ -43,7 +43,7 @@ type (
 
 var (
 	janitorTimeFormats = []string{
-		// prefered format
+		// preferred format
 		time.RFC3339,
 
 		// human format
@@ -58,6 +58,9 @@ var (
 		time.RFC1123,
 		time.RFC1123Z,
 		time.RFC3339Nano,
+
+		// least preferred format
+		"2006-01-02",
 	}
 )
 
