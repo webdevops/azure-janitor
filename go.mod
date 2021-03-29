@@ -6,7 +6,7 @@ require (
 	github.com/Azure/azure-sdk-for-go v52.6.0+incompatible
 	github.com/Azure/go-autorest/autorest v0.11.18
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.7
-	github.com/Azure/go-autorest/autorest/to v0.4.0 // indirect
+	github.com/Azure/go-autorest/autorest/to v0.4.0
 	github.com/Azure/go-autorest/autorest/validation v0.3.1 // indirect
 	github.com/golang/protobuf v1.5.1 // indirect
 	github.com/jessevdk/go-flags v1.5.0
