@@ -50,6 +50,8 @@ Application Options:
                                                   [$JANITOR_ROLEASSIGNMENTS_ROLEDEFINITIONID]
       --janitor.roleassignments.filter=           Additional $filter for Azure REST API for RoleAssignments
                                                   [$JANITOR_ROLEASSIGNMENTS_FILTER]
+      --janitor.roleassignments.descriptionttl=   Regexp for detecting ttl inside description of RoleAssignment
+                                                  [$JANITOR_ROLEASSIGNMENTS_DESCRIPTIONTTL]
       --bind=                                     Server address (default: :8080) [$SERVER_BIND]
 
 Help Options:
@@ -96,6 +98,8 @@ Supported relative timestamps
 RoleAssignments
 ---------------
 
+**General RoleAssignment TTL**
+
 To cleanup Azure RoleAssignments a list of Azure RoleDefinitions (multiple possible) have to be set for security reasons:
 
 ```
@@ -109,6 +113,44 @@ To cleanup Azure RoleAssignments a list of Azure RoleDefinitions (multiple possi
 
 This can be used for cleanup of temporary RoleAssignments.
 Expiry time is calculated based on Azure RoleAssignment creation time and specified TTL.
+
+**RoleAssignment based TTL**
+
+As RoleAssignments only have a `description` a custom (must less then the default ttl) ttl can be specified
+with a custom format and can be parsed with RegExp:
+
+```
+/azure-janitor \
+    --janitor.roleassignments \
+    --janitor.roleassignments.roledefinitionid=/subscriptions/xxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx/providers/Microsoft.Authorization/roleDefinitions/xxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx \
+    --janitor.roleassignments.roledefinitionid=/subscriptions/xxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx/providers/Microsoft.Authorization/roleDefinitions/xxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx \
+    --janitor.roleassignments.roledefinitionid=/subscriptions/xxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx/providers/Microsoft.Authorization/roleDefinitions/xxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx \
+    --janitor.roleassignments.ttl=6h \
+    --janitor.roleassignments.descriptionttl='\[ttl:([^\]]+)\]'
+```
+
+RoleAssignment example with ttl in description:
+```
+    {
+      "properties": {
+        "roleDefinitionId": "/subscriptions/xxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx/providers/Microsoft.Authorization/roleDefinitions/xxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx",
+        "principalId": "xxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx",
+        "principalType": "User",
+        "scope": "/subscriptions/xxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx/resourceGroups/XXXXXXXXXXXXXX/providers/...",
+        "condition": null,
+        "conditionVersion": null,
+        "createdOn": "2021-03-29T19:41:18.9035423Z",
+        "updatedOn": "2021-03-29T19:41:18.9035423Z",
+        "createdBy": "xxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx",
+        "updatedBy": "xxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx",
+        "delegatedManagedIdentityResourceId": null,
+        "description": "[ttl:1h]"
+      },
+      "id": "/subscriptions/xxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx/resourceGroups/XXXXXXXXXXXXXX/providers/.../providers/Microsoft.Authorization/roleAssignments/xxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx",
+      "type": "Microsoft.Authorization/roleAssignments",
+      "name": "xxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx"
+    },
+```
 
 ARM template usage
 ------------------

@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"regexp"
 	"runtime"
 	"strings"
 )
@@ -144,6 +145,10 @@ func initArgparser() {
 
 	if !opts.Janitor.ResourceGroups.Enable && !opts.Janitor.Resources.Enable && !opts.Janitor.Deployments.Enable && !opts.Janitor.RoleAssignments.Enable {
 		log.Fatal("no janitor task (resources, resourcegroups, deployments, roleassignments) enabled, not starting")
+	}
+
+	if opts.Janitor.RoleAssignments.DescriptionTtl != nil {
+		opts.Janitor.RoleAssignments.DescriptionTtlRegExp = regexp.MustCompile(*opts.Janitor.RoleAssignments.DescriptionTtl)
 	}
 
 	checkForDeprecations()

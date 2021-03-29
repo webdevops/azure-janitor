@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	log "github.com/sirupsen/logrus"
+	"regexp"
 	"time"
 )
 
@@ -49,11 +50,13 @@ type (
 			}
 
 			RoleAssignments struct {
-				Enable           bool          `long:"janitor.roleassignments"                    env:"JANITOR_ROLEASSIGNMENTS_ENABLE"  description:"Enable Azure RoleAssignments cleanup"`
-				Ttl              time.Duration `long:"janitor.roleassignments.ttl"                env:"JANITOR_ROLEASSIGNMENTS_TTL"  description:"Janitor roleassignment ttl (time.duration)"  default:"6h"`
-				RoleDefintionIds []string      `long:"janitor.roleassignments.roledefinitionid"   env:"JANITOR_ROLEASSIGNMENTS_ROLEDEFINITIONID"  env-delim:" " description:"Janitor roledefinition ID (eg: /subscriptions/xxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx/providers/Microsoft.Authorization/roleDefinitions/xxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx)"`
-				AdditionalFilter *string       `long:"janitor.roleassignments.filter"             env:"JANITOR_ROLEASSIGNMENTS_FILTER"  description:"Additional $filter for Azure REST API for RoleAssignments"`
-				Filter           string
+				Enable               bool          `long:"janitor.roleassignments"                    env:"JANITOR_ROLEASSIGNMENTS_ENABLE"  description:"Enable Azure RoleAssignments cleanup"`
+				Ttl                  time.Duration `long:"janitor.roleassignments.ttl"                env:"JANITOR_ROLEASSIGNMENTS_TTL"  description:"Janitor roleassignment ttl (time.duration)"  default:"6h"`
+				RoleDefintionIds     []string      `long:"janitor.roleassignments.roledefinitionid"   env:"JANITOR_ROLEASSIGNMENTS_ROLEDEFINITIONID"  env-delim:" " description:"Janitor roledefinition ID (eg: /subscriptions/xxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx/providers/Microsoft.Authorization/roleDefinitions/xxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx)"`
+				AdditionalFilter     *string       `long:"janitor.roleassignments.filter"             env:"JANITOR_ROLEASSIGNMENTS_FILTER"  description:"Additional $filter for Azure REST API for RoleAssignments"`
+				Filter               string
+				DescriptionTtl       *string `long:"janitor.roleassignments.descriptionttl"             env:"JANITOR_ROLEASSIGNMENTS_DESCRIPTIONTTL"  description:"Regexp for detecting ttl inside description of RoleAssignment"`
+				DescriptionTtlRegExp *regexp.Regexp
 			}
 		}
 

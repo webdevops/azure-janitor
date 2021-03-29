@@ -286,7 +286,7 @@ func (j *Janitor) getAzureApiVersionForSubscriptionResourceType(subscriptionId, 
 }
 
 func (j *Janitor) checkAzureResourceExpiry(logger *log.Entry, resourceType, resourceId string, resourceTags *map[string]*string) (resourceExpireTime *time.Time, resourceExpired bool, resourceTagRewriteNeeded bool) {
-	ttlValue := j.getTtlTagFromAzureResoruce(*resourceTags)
+	ttlValue := j.getTtlTagFromAzureResource(*resourceTags)
 
 	if ttlValue != nil {
 		if j.Conf.Logger.Verbose {
@@ -309,7 +309,7 @@ func (j *Janitor) checkAzureResourceExpiry(logger *log.Entry, resourceType, reso
 			}
 
 			resourceExpireTime = tagValueParsed
-		} else if val, durationParseErr := j.checkExpiryDuration(*ttlValue); durationParseErr == nil && val != nil {
+		} else if val, durationParseErr := j.parseExpiryAndBuildExpiryTime(*ttlValue); durationParseErr == nil && val != nil {
 			// try parse as duration
 			logger.Infof("found valid duration (%v)", *ttlValue)
 			ttlValue := val.Format(time.RFC3339)
@@ -325,7 +325,7 @@ func (j *Janitor) checkAzureResourceExpiry(logger *log.Entry, resourceType, reso
 	return
 }
 
-func (j *Janitor) getTtlTagFromAzureResoruce(tags map[string]*string) *string {
+func (j *Janitor) getTtlTagFromAzureResource(tags map[string]*string) *string {
 	// check target tag first
 	for tagName, tagValue := range tags {
 		if tagName == j.Conf.Janitor.TagTarget && tagValue != nil && *tagValue != "" {
@@ -343,30 +343,38 @@ func (j *Janitor) getTtlTagFromAzureResoruce(tags map[string]*string) *string {
 	return nil
 }
 
-func (j *Janitor) checkExpiryDuration(value string) (parsedTime *time.Time, err error) {
+func (j *Janitor) parseExpiryDuration(value string) (duration *time.Duration, err error) {
 	// sanity checks
 	value = strings.TrimSpace(value)
 	if value == "" {
 		return
 	}
 
+	now := time.Now()
+
 	// ISO8601 style duration
 	if val, parseErr := period.Parse(value); parseErr == nil {
 		// parse duration
-		calcTime := time.Now().Add(val.DurationApprox())
-		parsedTime = &calcTime
-		return
+		dur, _ := val.Duration()
+		return &dur, nil
 	}
 
 	// golang style duration
-	if val, parseErr := tparse.AddDuration(time.Now(), value); parseErr == nil {
-		parsedTime = &val
-		return
+	if val, parseErr := tparse.AddDuration(now, value); parseErr == nil {
+		dur := val.Sub(now)
+		return &dur, nil
 	}
 
-	err = fmt.Errorf("unable to parse '%v' as duration", value)
+	return nil, fmt.Errorf("unable to parse '%v' as duration", value)
+}
 
-	return
+func (j *Janitor) parseExpiryAndBuildExpiryTime(value string) (parsedTime *time.Time, err error) {
+	if duration, err := j.parseExpiryDuration(value); err == nil {
+		expiryTime := time.Now().Add(*duration)
+		return &expiryTime, nil
+	} else {
+		return nil, err
+	}
 }
 
 func (j *Janitor) checkExpiryDate(value string) (parsedTime *time.Time, expired bool, err error) {

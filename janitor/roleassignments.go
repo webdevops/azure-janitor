@@ -39,13 +39,35 @@ func (j *Janitor) runRoleAssignments(ctx context.Context, subscription subscript
 			"resourceGroup":    extractResourceGroupFromAzureId(*roleAssignment.Scope),
 		})
 
+		// check if RoleDefinitionID is set
+		// do not want to touch other RoleAssignments
 		if stringInSlice(*roleAssignment.RoleDefinitionID, j.Conf.Janitor.RoleAssignments.RoleDefintionIds) {
+			var roleAssignmentTtl *time.Duration
 			if j.Conf.Logger.Verbose {
 				roleAssignmentLogger.Infof("checking ttl")
 			}
 
-			roleAssignmentExpiry := roleAssignment.CreatedOn.UTC().Add(j.Conf.Janitor.RoleAssignments.Ttl)
+			// detect ttl from description
+			if j.Conf.Janitor.RoleAssignments.DescriptionTtlRegExp != nil && roleAssignment.Description != nil {
+				descriptionTtlMatch := j.Conf.Janitor.RoleAssignments.DescriptionTtlRegExp.FindSubmatch([]byte(*roleAssignment.Description))
+
+				if len(descriptionTtlMatch) >= 2 {
+					if v, err := j.parseExpiryDuration(string(descriptionTtlMatch[1])); err == nil {
+						roleAssignmentTtl = v
+					}
+				}
+			}
+
+			// use default ttl if no ttl was detected or ttl is higher then default
+			if roleAssignmentTtl == nil || roleAssignmentTtl.Seconds() > j.Conf.Janitor.RoleAssignments.Ttl.Seconds() {
+				roleAssignmentTtl = &j.Conf.Janitor.RoleAssignments.Ttl
+			}
+
+			// calulate expiry and check if already expired
+			roleAssignmentExpiry := roleAssignment.CreatedOn.UTC().Add(*roleAssignmentTtl)
 			roleAssignmentExpired := time.Now().After(roleAssignmentExpiry)
+
+			roleAssignmentLogger.Debugf("detected ttl %v", roleAssignmentTtl.String())
 
 			resourceTtl.AddTime(prometheus.Labels{
 				"roleAssignmentId": *roleAssignment.ID,
