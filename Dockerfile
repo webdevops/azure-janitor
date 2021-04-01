@@ -11,7 +11,6 @@ RUN go mod download
 COPY ./ /go/src/github.com/webdevops/azure-janitor
 RUN make test
 RUN make lint
-RUN make gosec
 RUN make build
 RUN ./azure-janitor --help
 
