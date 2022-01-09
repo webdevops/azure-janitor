@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/resources/mgmt/subscriptions"
 	"github.com/Azure/azure-sdk-for-go/services/preview/authorization/mgmt/2020-04-01-preview/authorization"
+	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	prometheusCommon "github.com/webdevops/go-prometheus-common"
@@ -30,12 +31,12 @@ func (j *Janitor) runRoleAssignments(ctx context.Context, subscription subscript
 		}
 
 		roleAssignmentLogger := contextLogger.WithFields(log.Fields{
-			"roleAssignmentId": *roleAssignment.ID,
-			"scope":            *roleAssignment.Scope,
-			"principalId":      *roleAssignment.PrincipalID,
+			"roleAssignmentId": to.String(roleAssignment.ID),
+			"scope":            to.String(roleAssignment.Scope),
+			"principalId":      to.String(roleAssignment.PrincipalID),
 			"principalType":    string(roleAssignment.PrincipalType),
-			"roleDefinitionId": *roleAssignment.RoleDefinitionID,
-			"subscriptionID":   *subscription.SubscriptionID,
+			"roleDefinitionId": to.String(roleAssignment.RoleDefinitionID),
+			"subscriptionID":   to.String(subscription.SubscriptionID),
 			"resourceGroup":    extractResourceGroupFromAzureId(*roleAssignment.Scope),
 		})
 
@@ -70,24 +71,24 @@ func (j *Janitor) runRoleAssignments(ctx context.Context, subscription subscript
 			roleAssignmentLogger.Debugf("detected ttl %v", roleAssignmentTtl.String())
 
 			resourceTtl.AddTime(prometheus.Labels{
-				"roleAssignmentId": *roleAssignment.ID,
-				"scope":            *roleAssignment.Scope,
-				"principalId":      *roleAssignment.PrincipalID,
-				"principalType":    string(roleAssignment.PrincipalType),
-				"roleDefinitionId": *roleAssignment.RoleDefinitionID,
-				"subscriptionID":   *subscription.SubscriptionID,
+				"roleAssignmentId": to.String(roleAssignment.ID),
+				"scope":            to.String(roleAssignment.Scope),
+				"principalId":      to.String(roleAssignment.PrincipalID),
+				"principalType":    to.String(roleAssignment.Type),
+				"roleDefinitionId": to.String(roleAssignment.RoleDefinitionID),
+				"subscriptionID":   to.String(subscription.SubscriptionID),
 				"resourceGroup":    extractResourceGroupFromAzureId(*roleAssignment.Scope),
 			}, roleAssignmentExpiry)
 
 			if roleAssignmentExpired {
 				if !j.Conf.DryRun {
 					roleAssignmentLogger.Infof("expired, trying to delete")
-					if _, err := client.DeleteByID(ctx, *roleAssignment.ID); err == nil {
+					if _, err := client.DeleteByID(ctx, to.String(roleAssignment.ID)); err == nil {
 						// successfully deleted
 						roleAssignmentLogger.Infof("successfully deleted")
 
 						j.Prometheus.MetricDeletedResource.With(prometheus.Labels{
-							"subscriptionID": *subscription.SubscriptionID,
+							"subscriptionID": to.String(subscription.SubscriptionID),
 							"resourceType":   resourceType,
 						}).Inc()
 					} else {
@@ -95,7 +96,7 @@ func (j *Janitor) runRoleAssignments(ctx context.Context, subscription subscript
 						roleAssignmentLogger.Errorf("ERROR %s", err)
 
 						j.Prometheus.MetricErrors.With(prometheus.Labels{
-							"subscriptionID": *subscription.SubscriptionID,
+							"subscriptionID": to.String(subscription.SubscriptionID),
 							"resourceType":   resourceType,
 						}).Inc()
 					}
