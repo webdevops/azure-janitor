@@ -7,6 +7,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/resources/mgmt/subscriptions"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
+	"github.com/Azure/go-autorest/autorest/to"
 	tparse "github.com/karrick/tparse/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rickb777/date/period"
@@ -228,18 +229,33 @@ func (j *Janitor) initAuzreApiVersions() {
 
 	j.apiVersionMap = map[string]map[string]string{}
 	for _, subscription := range j.Azure.Subscriptions {
-		client := resources.NewProvidersClientWithBaseURI(j.Azure.Environment.ResourceManagerEndpoint, *subscription.SubscriptionID)
-		client.Authorizer = j.Azure.Authorizer
-
 		subscriptionId := *subscription.SubscriptionID
 
-		j.apiVersionMap[subscriptionId] = map[string]string{}
-
-		result, err := client.ListComplete(ctx, nil, "")
+		// fetch location translation map
+		locationClient := subscriptions.NewClientWithBaseURI(j.Azure.Environment.ResourceManagerEndpoint)
+		locationClient.Authorizer = j.Azure.Authorizer
+		locationResult, err := locationClient.ListLocations(ctx, subscriptionId, nil)
 		if err != nil {
 			panic(err)
 		}
 
+		locationMap := map[string]string{}
+		for _, location := range *locationResult.Value {
+			locationDisplayName := to.String(location.DisplayName)
+			locationName := to.String(location.Name)
+			locationMap[locationDisplayName] = locationName
+		}
+
+		// fetch providers
+		providersClient := resources.NewProvidersClientWithBaseURI(j.Azure.Environment.ResourceManagerEndpoint, *subscription.SubscriptionID)
+		providersClient.Authorizer = j.Azure.Authorizer
+
+		result, err := providersClient.ListComplete(ctx, nil, "")
+		if err != nil {
+			panic(err)
+		}
+
+		j.apiVersionMap[subscriptionId] = map[string]string{}
 		for _, provider := range *result.Response().Value {
 			if provider.ResourceTypes == nil {
 				continue
@@ -256,35 +272,45 @@ func (j *Janitor) initAuzreApiVersions() {
 					strings.ToLower(*resourceType.ResourceType),
 				)
 
-				lastApiVersion := ""
-				lastApiPreviewVersion := ""
-				for _, apiVersion := range *resourceType.APIVersions {
-					if strings.Contains(apiVersion, "-preview") {
-						if lastApiVersion == "" || lastApiPreviewVersion > apiVersion {
-							lastApiPreviewVersion = apiVersion
-						}
-					} else {
-						if lastApiVersion == "" || lastApiVersion > apiVersion {
-							lastApiVersion = apiVersion
+				for _, location := range *resourceType.Locations {
+					lastApiVersion := ""
+					lastApiPreviewVersion := ""
+					for _, apiVersion := range *resourceType.APIVersions {
+						if strings.Contains(apiVersion, "-preview") {
+							if lastApiVersion == "" || lastApiPreviewVersion > apiVersion {
+								lastApiPreviewVersion = apiVersion
+							}
+						} else {
+							if lastApiVersion == "" || lastApiVersion > apiVersion {
+								lastApiVersion = apiVersion
+							}
 						}
 					}
-				}
 
-				if lastApiVersion != "" {
-					j.apiVersionMap[subscriptionId][resourceTypeName] = lastApiVersion
-				} else if lastApiPreviewVersion != "" {
-					j.apiVersionMap[subscriptionId][resourceTypeName] = lastApiPreviewVersion
+					// try to translate location to internal type
+					if val, ok := locationMap[location]; ok {
+						location = val
+					}
+
+					key := strings.ToLower(fmt.Sprintf("%s::%s", location, resourceTypeName))
+					if lastApiVersion != "" {
+						j.apiVersionMap[subscriptionId][key] = lastApiVersion
+					} else if lastApiPreviewVersion != "" {
+						j.apiVersionMap[subscriptionId][key] = lastApiPreviewVersion
+					}
 				}
 			}
 		}
 	}
 }
 
-func (j *Janitor) getAzureApiVersionForSubscriptionResourceType(subscriptionId, resourceType string) (apiVersion string) {
-	resourceType = strings.ToLower(resourceType)
-	if val, ok := j.apiVersionMap[subscriptionId][resourceType]; ok {
+func (j *Janitor) getAzureApiVersionForResourceType(subscriptionId, location, resourceType string) (apiVersion string) {
+	key := strings.ToLower(fmt.Sprintf("%s::%s", location, resourceType))
+	fmt.Println(key)
+	if val, ok := j.apiVersionMap[subscriptionId][key]; ok {
 		apiVersion = val
 	}
+	fmt.Println(apiVersion)
 	return
 }
 

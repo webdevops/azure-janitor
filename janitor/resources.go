@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/Azure/azure-sdk-for-go/profiles/2020-09-01/resources/mgmt/resources"
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/resources/mgmt/subscriptions"
+	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	prometheusCommon "github.com/webdevops/go-prometheus-common"
@@ -24,7 +25,7 @@ func (j *Janitor) runResources(ctx context.Context, subscription subscriptions.S
 
 	for _, resource := range *resourceResult.Response().Value {
 		resourceType := *resource.Type
-		resourceTypeApiVersion := j.getAzureApiVersionForSubscriptionResourceType(*subscription.SubscriptionID, resourceType)
+		resourceTypeApiVersion := j.getAzureApiVersionForResourceType(*subscription.SubscriptionID, to.String(resource.Location), resourceType)
 
 		resourceLogger := contextLogger.WithField("resource", *resource.ID)
 
