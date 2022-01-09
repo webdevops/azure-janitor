@@ -228,7 +228,7 @@ func (j *Janitor) initAuzreApiVersions() {
 
 	j.apiVersionMap = map[string]map[string]string{}
 	for _, subscription := range j.Azure.Subscriptions {
-		client := features.NewProvidersClient(*subscription.SubscriptionID)
+		client := features.NewProvidersClientWithBaseURI(j.Azure.Environment.ResourceManagerEndpoint, *subscription.SubscriptionID)
 		client.Authorizer = j.Azure.Authorizer
 
 		subscriptionId := *subscription.SubscriptionID

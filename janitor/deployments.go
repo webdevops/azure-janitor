@@ -19,7 +19,7 @@ func (j *Janitor) runDeployments(ctx context.Context, subscription subscriptions
 
 	resourceTtl := prometheusCommon.NewMetricsList()
 
-	deploymentClient := resources.NewDeploymentsClient(*subscription.SubscriptionID)
+	deploymentClient := resources.NewDeploymentsClientWithBaseURI(j.Azure.Environment.ResourceManagerEndpoint, *subscription.SubscriptionID)
 	deploymentClient.Authorizer = j.Azure.Authorizer
 
 	resourceType := "Microsoft.Resources/deployments"

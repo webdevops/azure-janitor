@@ -190,7 +190,8 @@ func initAzureConnection() {
 	if err != nil {
 		panic(err)
 	}
-	subscriptionsClient := subscriptions.NewClient()
+
+	subscriptionsClient := subscriptions.NewClientWithBaseURI(azureEnvironment.ResourceManagerEndpoint)
 	subscriptionsClient.Authorizer = azureAuthorizer
 
 	if len(opts.Azure.Subscription) == 0 {
