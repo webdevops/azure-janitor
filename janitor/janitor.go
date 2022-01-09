@@ -3,7 +3,7 @@ package janitor
 import (
 	"context"
 	"fmt"
-	"github.com/Azure/azure-sdk-for-go/profiles/latest/resources/mgmt/features"
+	"github.com/Azure/azure-sdk-for-go/profiles/latest/resources/mgmt/resources"
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/resources/mgmt/subscriptions"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
@@ -228,7 +228,7 @@ func (j *Janitor) initAuzreApiVersions() {
 
 	j.apiVersionMap = map[string]map[string]string{}
 	for _, subscription := range j.Azure.Subscriptions {
-		client := features.NewProvidersClientWithBaseURI(j.Azure.Environment.ResourceManagerEndpoint, *subscription.SubscriptionID)
+		client := resources.NewProvidersClientWithBaseURI(j.Azure.Environment.ResourceManagerEndpoint, *subscription.SubscriptionID)
 		client.Authorizer = j.Azure.Authorizer
 
 		subscriptionId := *subscription.SubscriptionID

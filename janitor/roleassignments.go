@@ -20,7 +20,7 @@ func (j *Janitor) runRoleAssignments(ctx context.Context, subscription subscript
 	client := authorization.NewRoleAssignmentsClientWithBaseURI(j.Azure.Environment.ResourceManagerEndpoint, *subscription.SubscriptionID)
 	client.Authorizer = j.Azure.Authorizer
 
-	result, err := client.ListComplete(ctx, filter)
+	result, err := client.ListComplete(ctx, filter, "")
 	if err != nil {
 		panic(err)
 	}
@@ -83,7 +83,7 @@ func (j *Janitor) runRoleAssignments(ctx context.Context, subscription subscript
 			if roleAssignmentExpired {
 				if !j.Conf.DryRun {
 					roleAssignmentLogger.Infof("expired, trying to delete")
-					if _, err := client.DeleteByID(ctx, to.String(roleAssignment.ID)); err == nil {
+					if _, err := client.DeleteByID(ctx, to.String(roleAssignment.ID), ""); err == nil {
 						// successfully deleted
 						roleAssignmentLogger.Infof("successfully deleted")
 
