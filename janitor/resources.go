@@ -27,7 +27,16 @@ func (j *Janitor) runResources(ctx context.Context, subscription subscriptions.S
 		resourceType := *resource.Type
 		resourceTypeApiVersion := j.getAzureApiVersionForResourceType(*subscription.SubscriptionID, to.String(resource.Location), resourceType)
 
-		resourceLogger := contextLogger.WithField("resource", *resource.ID)
+		resourceLogger := contextLogger.WithFields(log.Fields{
+			"resource":   *resource.ID,
+			"location":   to.String(resource.Location),
+			"apiVersion": resourceTypeApiVersion,
+		})
+
+		if resourceTypeApiVersion == "" {
+			resourceLogger.Errorf("unable to detect apiVersion for Azure resource, cannot delete resource (please report this issue as bug)")
+			continue
+		}
 
 		if resourceTypeApiVersion != "" && resource.Tags != nil {
 			resourceExpiryTime, resourceExpired, resourceTagUpdateNeeded := j.checkAzureResourceExpiry(resourceLogger, resourceType, *resource.ID, &resource.Tags)

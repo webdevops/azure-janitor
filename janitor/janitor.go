@@ -19,6 +19,10 @@ import (
 	"time"
 )
 
+const (
+	ApiVersionNoLocation = "UNDEFINED"
+)
+
 type (
 	Janitor struct {
 		apiVersionMap map[string]map[string]string
@@ -272,45 +276,59 @@ func (j *Janitor) initAuzreApiVersions() {
 					strings.ToLower(*resourceType.ResourceType),
 				)
 
-				for _, location := range *resourceType.Locations {
-					lastApiVersion := ""
-					lastApiPreviewVersion := ""
-					for _, apiVersion := range *resourceType.APIVersions {
-						if strings.Contains(apiVersion, "-preview") {
-							if lastApiVersion == "" || lastApiPreviewVersion > apiVersion {
-								lastApiPreviewVersion = apiVersion
-							}
-						} else {
-							if lastApiVersion == "" || lastApiVersion > apiVersion {
-								lastApiVersion = apiVersion
-							}
+				// select best last apiversion
+				lastApiVersion := ""
+				lastApiPreviewVersion := ""
+				providerApiVersion := ""
+				for _, apiVersion := range *resourceType.APIVersions {
+					if strings.Contains(apiVersion, "-preview") {
+						if lastApiVersion == "" || lastApiPreviewVersion > apiVersion {
+							lastApiPreviewVersion = apiVersion
+						}
+					} else {
+						if lastApiVersion == "" || lastApiVersion > apiVersion {
+							lastApiVersion = apiVersion
 						}
 					}
+				}
 
+				// choose best apiversion
+				if lastApiVersion != "" {
+					providerApiVersion = lastApiVersion
+				} else if lastApiPreviewVersion != "" {
+					providerApiVersion = lastApiPreviewVersion
+				}
+
+				// add all locations (if available)
+				for _, location := range *resourceType.Locations {
 					// try to translate location to internal type
 					if val, ok := locationMap[location]; ok {
 						location = val
 					}
 
 					key := strings.ToLower(fmt.Sprintf("%s::%s", location, resourceTypeName))
-					if lastApiVersion != "" {
-						j.apiVersionMap[subscriptionId][key] = lastApiVersion
-					} else if lastApiPreviewVersion != "" {
-						j.apiVersionMap[subscriptionId][key] = lastApiPreviewVersion
-					}
+					j.apiVersionMap[subscriptionId][key] = providerApiVersion
 				}
+
+				// add no location fallback
+				key := strings.ToLower(fmt.Sprintf("%s::%s", ApiVersionNoLocation, resourceTypeName))
+				j.apiVersionMap[subscriptionId][key] = providerApiVersion
+
 			}
 		}
 	}
 }
 
 func (j *Janitor) getAzureApiVersionForResourceType(subscriptionId, location, resourceType string) (apiVersion string) {
-	key := strings.ToLower(fmt.Sprintf("%s::%s", location, resourceType))
-	fmt.Println(key)
-	if val, ok := j.apiVersionMap[subscriptionId][key]; ok {
+	locationKey := strings.ToLower(fmt.Sprintf("%s::%s", location, resourceType))
+	unknownKey := strings.ToLower(fmt.Sprintf("%s::%s", ApiVersionNoLocation, resourceType))
+	if val, ok := j.apiVersionMap[subscriptionId][locationKey]; ok {
+		// location based apiVersion
+		apiVersion = val
+	} else if val, ok := j.apiVersionMap[subscriptionId][unknownKey]; ok {
+		// unknown location based apiVersion\
 		apiVersion = val
 	}
-	fmt.Println(apiVersion)
 	return
 }
 
