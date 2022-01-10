@@ -35,6 +35,12 @@ func (j *Janitor) runResources(ctx context.Context, subscription subscriptions.S
 
 		if resourceTypeApiVersion == "" {
 			resourceLogger.Errorf("unable to detect apiVersion for Azure resource, cannot delete resource (please report this issue as bug)")
+
+			j.Prometheus.MetricErrors.With(prometheus.Labels{
+				"subscriptionID": *subscription.SubscriptionID,
+				"resourceType":   resourceType,
+			}).Inc()
+
 			continue
 		}
 
