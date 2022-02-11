@@ -15,12 +15,12 @@ func (j *Janitor) runDeployments(ctx context.Context, subscription subscriptions
 	contextLogger := log.WithField("task", "deployment")
 
 	client := resources.NewGroupsClientWithBaseURI(j.Azure.Environment.ResourceManagerEndpoint, *subscription.SubscriptionID)
-	client.Authorizer = j.Azure.Authorizer
+	j.decorateAzureAutorest(&client.Client)
 
 	resourceTtl := prometheusCommon.NewMetricsList()
 
 	deploymentClient := resources.NewDeploymentsClientWithBaseURI(j.Azure.Environment.ResourceManagerEndpoint, *subscription.SubscriptionID)
-	deploymentClient.Authorizer = j.Azure.Authorizer
+	j.decorateAzureAutorest(&deploymentClient.Client)
 
 	resourceType := "Microsoft.Resources/deployments"
 

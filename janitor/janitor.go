@@ -14,6 +14,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/webdevops/azure-janitor/config"
 	prometheusCommon "github.com/webdevops/go-prometheus-common"
+	"github.com/webdevops/go-prometheus-common/azuretracing"
 	"strings"
 	"sync"
 	"time"
@@ -29,6 +30,8 @@ type (
 
 		Conf  config.Opts
 		Azure JanitorAzureConfig
+
+		UserAgent string
 
 		Prometheus struct {
 			MetricDuration           *prometheus.GaugeVec
@@ -70,6 +73,41 @@ var (
 )
 
 func (j *Janitor) Init() {
+	j.initPrometheus()
+	j.initAzure()
+}
+
+func (j *Janitor) initAzure() {
+	ctx := context.Background()
+	j.Azure.Subscriptions = []subscriptions.Subscription{}
+
+	client := subscriptions.NewClientWithBaseURI(j.Azure.Environment.ResourceManagerEndpoint)
+	j.decorateAzureAutorest(&client.Client)
+
+	if len(j.Conf.Azure.Subscription) == 0 {
+		// auto lookup subscriptions
+		listResult, err := client.List(ctx)
+		if err != nil {
+			panic(err)
+		}
+		j.Azure.Subscriptions = listResult.Values()
+
+		if len(j.Azure.Subscriptions) == 0 {
+			log.Panic("no Azure Subscriptions found via auto detection, does this ServicePrincipal have read permissions to the subcriptions?")
+		}
+	} else {
+		// fixed subscription list
+		for _, subId := range j.Conf.Azure.Subscription {
+			result, err := client.Get(ctx, subId)
+			if err != nil {
+				panic(err)
+			}
+			j.Azure.Subscriptions = append(j.Azure.Subscriptions, result)
+		}
+	}
+}
+
+func (j *Janitor) initPrometheus() {
 	j.Prometheus.MetricDuration = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "azurejanitor_duration",
@@ -237,7 +275,8 @@ func (j *Janitor) initAuzreApiVersions() {
 
 		// fetch location translation map
 		locationClient := subscriptions.NewClientWithBaseURI(j.Azure.Environment.ResourceManagerEndpoint)
-		locationClient.Authorizer = j.Azure.Authorizer
+		j.decorateAzureAutorest(&locationClient.Client)
+
 		locationResult, err := locationClient.ListLocations(ctx, subscriptionId, nil)
 		if err != nil {
 			panic(err)
@@ -252,7 +291,7 @@ func (j *Janitor) initAuzreApiVersions() {
 
 		// fetch providers
 		providersClient := resources.NewProvidersClientWithBaseURI(j.Azure.Environment.ResourceManagerEndpoint, *subscription.SubscriptionID)
-		providersClient.Authorizer = j.Azure.Authorizer
+		j.decorateAzureAutorest(&providersClient.Client)
 
 		result, err := providersClient.ListComplete(ctx, nil, "")
 		if err != nil {
@@ -450,4 +489,13 @@ func (j *Janitor) checkExpiryDate(value string) (parsedTime *time.Time, expired 
 	}
 
 	return
+}
+
+func (j *Janitor) decorateAzureAutorest(client *autorest.Client) {
+	client.Authorizer = j.Azure.Authorizer
+	if err := client.AddToUserAgent(j.UserAgent); err != nil {
+		log.Panic(err)
+	}
+
+	azuretracing.DecoreAzureAutoRest(client)
 }

@@ -18,7 +18,7 @@ func (j *Janitor) runRoleAssignments(ctx context.Context, subscription subscript
 	resourceType := "Microsoft.Authorization/roleAssignments"
 
 	client := authorization.NewRoleAssignmentsClientWithBaseURI(j.Azure.Environment.ResourceManagerEndpoint, *subscription.SubscriptionID)
-	client.Authorizer = j.Azure.Authorizer
+	j.decorateAzureAutorest(&client.Client)
 
 	result, err := client.ListComplete(ctx, filter, "")
 	if err != nil {

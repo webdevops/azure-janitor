@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/resources/mgmt/subscriptions"
 	"github.com/Azure/go-autorest/autorest"
@@ -12,6 +11,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/webdevops/azure-janitor/config"
 	"github.com/webdevops/azure-janitor/janitor"
+	"github.com/webdevops/go-prometheus-common/azuretracing"
 	"net/http"
 	"os"
 	"path"
@@ -22,6 +22,8 @@ import (
 
 const (
 	Author = "webdevops.io"
+
+	UserAgent = "azure-janitor/"
 )
 
 var (
@@ -49,11 +51,11 @@ func main() {
 
 	log.Infof("init Janitor")
 	j := janitor.Janitor{
-		Conf: opts,
+		Conf:      opts,
+		UserAgent: UserAgent + gitTag,
 		Azure: janitor.JanitorAzureConfig{
-			Authorizer:    azureAuthorizer,
-			Subscriptions: azureSubscriptions,
-			Environment:   azureEnvironment,
+			Authorizer:  azureAuthorizer,
+			Environment: azureEnvironment,
 		},
 	}
 	j.Init()
@@ -177,7 +179,6 @@ func checkForDeprecations() {
 // Init and build Azure authorzier
 func initAzureConnection() {
 	var err error
-	ctx := context.Background()
 
 	// get environment
 	azureEnvironment, err = azure.EnvironmentFromName(*opts.Azure.Environment)
@@ -190,32 +191,6 @@ func initAzureConnection() {
 	if err != nil {
 		panic(err)
 	}
-
-	subscriptionsClient := subscriptions.NewClientWithBaseURI(azureEnvironment.ResourceManagerEndpoint)
-	subscriptionsClient.Authorizer = azureAuthorizer
-
-	if len(opts.Azure.Subscription) == 0 {
-		// auto lookup subscriptions
-		listResult, err := subscriptionsClient.List(ctx)
-		if err != nil {
-			panic(err)
-		}
-		azureSubscriptions = listResult.Values()
-
-		if len(azureSubscriptions) == 0 {
-			log.Panic("no Azure Subscriptions found via auto detection, does this ServicePrincipal have read permissions to the subcriptions?")
-		}
-	} else {
-		// fixed subscription list
-		azureSubscriptions = []subscriptions.Subscription{}
-		for _, subId := range opts.Azure.Subscription {
-			result, err := subscriptionsClient.Get(ctx, subId)
-			if err != nil {
-				panic(err)
-			}
-			azureSubscriptions = append(azureSubscriptions, result)
-		}
-	}
 }
 
 // start and handle prometheus handler
@@ -227,6 +202,7 @@ func startHttpServer() {
 		}
 	})
 
-	http.Handle("/metrics", promhttp.Handler())
+	http.Handle("/metrics", azuretracing.RegisterAzureMetricAutoClean(promhttp.Handler()))
+
 	log.Fatal(http.ListenAndServe(opts.ServerBind, nil))
 }

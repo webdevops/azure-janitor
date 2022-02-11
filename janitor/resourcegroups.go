@@ -14,7 +14,7 @@ func (j *Janitor) runResourceGroups(ctx context.Context, subscription subscripti
 	resourceType := "Microsoft.Resources/resourceGroups"
 
 	client := resources.NewGroupsClientWithBaseURI(j.Azure.Environment.ResourceManagerEndpoint, *subscription.SubscriptionID)
-	client.Authorizer = j.Azure.Authorizer
+	j.decorateAzureAutorest(&client.Client)
 
 	resourceTtl := prometheusCommon.NewMetricsList()
 

@@ -14,7 +14,7 @@ func (j *Janitor) runResources(ctx context.Context, subscription subscriptions.S
 	contextLogger := log.WithField("task", "resource")
 
 	client := resources.NewClientWithBaseURI(j.Azure.Environment.ResourceManagerEndpoint, *subscription.SubscriptionID)
-	client.Authorizer = j.Azure.Authorizer
+	j.decorateAzureAutorest(&client.Client)
 
 	resourceTtl := prometheusCommon.NewMetricsList()
 

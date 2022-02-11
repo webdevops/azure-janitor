@@ -1,5 +1,4 @@
-Azure Janitor
-==============================
+# Azure Janitor
 
 [![license](https://img.shields.io/github/license/webdevops/azure-janitor.svg)](https://github.com/webdevops/azure-janitor/blob/master/LICENSE)
 [![DockerHub](https://img.shields.io/badge/DockerHub-webdevops%2Fazure--janitor-blue)](https://hub.docker.com/r/webdevops/azure-janitor/)
@@ -14,8 +13,7 @@ Janitor tasks:
 - ResourceGroup Deployment cleanup based on TTL and limit (count)
 - RoleAssignments cleanup based on RoleDefinitionIds and TTL
 
-Usage
------
+## Usage
 
 ```
 Usage:
@@ -61,8 +59,7 @@ Help Options:
 
 for Azure API authentication (using ENV vars) see https://docs.microsoft.com/en-us/azure/developer/go/azure-sdk-authentication
 
-Azure tag
----------
+## Azure tag
 
 By default the Azure Janitor is using `ttl` as tag and sets the expiry timestamp to `ttl_expiry`.
 Based on timestamp in `ttl_expiry` it will trigger the cleanup of the corresponding resource if expired.
@@ -97,8 +94,7 @@ Supported relative timestamps
     - 1mo (1 month)
     - 1y (1 year)
 
-RoleAssignments
----------------
+## RoleAssignments
 
 **General RoleAssignment TTL**
 
@@ -154,8 +150,7 @@ RoleAssignment example with ttl in description:
     },
 ```
 
-ARM template usage
-------------------
+## ARM template usage
 
 Using relative time (duration):
 ```
@@ -233,8 +228,7 @@ Using absolute calculated time:
 
 ```
 
-Metrics
--------
+## Metrics
 
 | Metric                                         | Type         | Description                                                                           |
 |------------------------------------------------|--------------|---------------------------------------------------------------------------------------|
@@ -243,3 +237,22 @@ Metrics
 | `azurejanitor_roleassignment_ttl`              | Gauge        | List of Azure RoleAssignments with expiry timestamp as value                          |
 | `azurejanitor_resources_deleted`               | Counter      | Number of deleted resources (by resource type)                                        |
 | `azurejanitor_errors`                          | Counter      | Number of failed deleted resources (by resource type)                                 |
+
+### Azuretracing metrics
+
+(with 22.2.0 and later)
+
+Azuretracing metrics collects latency and latency from azure-sdk-for-go and creates metrics and is controllable using
+environment variables (eg. setting buckets, disabling metrics or disable autoreset).
+
+| Metric                                   | Description                                                                            |
+|------------------------------------------|----------------------------------------------------------------------------------------|
+| `azurerm_api_ratelimit`                  | Azure ratelimit metrics (only on /metrics, resets after query due to limited validity) |
+| `azurerm_api_request_*`                  | Azure request count and latency as histogram                                           |
+
+| Environment variable                     | Example                          | Description                                              |
+|------------------------------------------|----------------------------------|----------------------------------------------------------|
+| `METRIC_AZURERM_API_REQUEST_BUCKETS`     | `1, 2.5, 5, 10, 30, 60, 90, 120` | Sets buckets for `azurerm_api_request` histogram metric  |
+| `METRIC_AZURERM_API_REQUEST_DISABLE`     | `false`                          | Disables `azurerm_api_request_*` metric                  |
+| `METRIC_AZURERM_API_RATELIMIT_DISABLE`   | `false`                          | Disables `azurerm_api_ratelimit` metric                  |
+| `METRIC_AZURERM_API_RATELIMIT_AUTORESET` | `false`                          | Disables `azurerm_api_ratelimit` autoreset after fetch   |
