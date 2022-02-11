@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/Azure/azure-sdk-for-go/profiles/latest/resources/mgmt/subscriptions"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/azure/auth"
@@ -30,8 +29,7 @@ var (
 	argparser *flags.Parser
 	opts      config.Opts
 
-	azureAuthorizer    autorest.Authorizer
-	azureSubscriptions []subscriptions.Subscription
+	azureAuthorizer autorest.Authorizer
 
 	azureEnvironment azure.Environment //nolint:golint,unused
 
