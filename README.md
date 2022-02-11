@@ -4,6 +4,7 @@ Azure Janitor
 [![license](https://img.shields.io/github/license/webdevops/azure-janitor.svg)](https://github.com/webdevops/azure-janitor/blob/master/LICENSE)
 [![DockerHub](https://img.shields.io/badge/DockerHub-webdevops%2Fazure--janitor-blue)](https://hub.docker.com/r/webdevops/azure-janitor/)
 [![Quay.io](https://img.shields.io/badge/Quay.io-webdevops%2Fazure--janitor-blue)](https://quay.io/repository/webdevops/azure-janitor)
+[![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/azure-janitor)](https://artifacthub.io/packages/search?repo=azure-janitor)
 
 Janitor for Azure
 
@@ -58,7 +59,7 @@ Help Options:
   -h, --help                                      Show this help message
 ```
 
-for Azure API authentication (using ENV vars) see https://github.com/Azure/azure-sdk-for-go#authentication
+for Azure API authentication (using ENV vars) see https://docs.microsoft.com/en-us/azure/developer/go/azure-sdk-authentication
 
 Azure tag
 ---------
