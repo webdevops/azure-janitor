@@ -497,5 +497,5 @@ func (j *Janitor) decorateAzureAutorest(client *autorest.Client) {
 		log.Panic(err)
 	}
 
-	azuretracing.DecoreAzureAutoRest(client)
+	azuretracing.DecorateAzureAutoRestClient(client)
 }

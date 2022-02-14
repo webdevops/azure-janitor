@@ -14,7 +14,7 @@ require (
 	github.com/prometheus/common v0.32.1 // indirect
 	github.com/rickb777/date v1.17.0
 	github.com/sirupsen/logrus v1.8.1
-	github.com/webdevops/go-prometheus-common v0.0.0-20220211101814-4c9913788fe1
+	github.com/webdevops/go-prometheus-common v0.0.0-20220214222004-cea8f38b44b7
 	golang.org/x/crypto v0.0.0-20220210151621-f4118a5b28e2 // indirect
 )
 
