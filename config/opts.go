@@ -2,9 +2,10 @@ package config
 
 import (
 	"encoding/json"
-	log "github.com/sirupsen/logrus"
 	"regexp"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 type (

@@ -1,12 +1,14 @@
 package janitor
 
 import (
-	"github.com/Azure/go-autorest/autorest/to"
-	log "github.com/sirupsen/logrus"
-	"github.com/webdevops/azure-janitor/config"
 	"io/ioutil"
 	"testing"
 	"time"
+
+	"github.com/Azure/go-autorest/autorest/to"
+	log "github.com/sirupsen/logrus"
+
+	"github.com/webdevops/azure-janitor/config"
 )
 
 func buildJanitorObj() *Janitor {

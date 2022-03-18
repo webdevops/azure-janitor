@@ -3,6 +3,10 @@ package janitor
 import (
 	"context"
 	"fmt"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/resources/mgmt/resources"
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/resources/mgmt/subscriptions"
 	"github.com/Azure/go-autorest/autorest"
@@ -12,12 +16,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rickb777/date/period"
 	log "github.com/sirupsen/logrus"
-	"github.com/webdevops/azure-janitor/config"
 	prometheusCommon "github.com/webdevops/go-prometheus-common"
 	"github.com/webdevops/go-prometheus-common/azuretracing"
-	"strings"
-	"sync"
-	"time"
+
+	"github.com/webdevops/azure-janitor/config"
 )
 
 const (
