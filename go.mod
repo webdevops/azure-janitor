@@ -3,7 +3,7 @@ module github.com/webdevops/azure-janitor
 go 1.17
 
 require (
-	github.com/Azure/azure-sdk-for-go v61.4.0+incompatible
+	github.com/Azure/azure-sdk-for-go v62.2.0+incompatible
 	github.com/Azure/go-autorest/autorest v0.11.24
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.11
 	github.com/Azure/go-autorest/autorest/to v0.4.0
@@ -14,8 +14,8 @@ require (
 	github.com/prometheus/common v0.32.1 // indirect
 	github.com/rickb777/date v1.17.0
 	github.com/sirupsen/logrus v1.8.1
-	github.com/webdevops/go-prometheus-common v0.0.0-20220214222004-cea8f38b44b7
-	golang.org/x/crypto v0.0.0-20220210151621-f4118a5b28e2 // indirect
+	github.com/webdevops/go-prometheus-common v0.0.0-20220317231258-4e72a1cf1b48
+	golang.org/x/crypto v0.0.0-20220315160706-3147a52a75dd // indirect
 )
 
 require (
@@ -28,7 +28,7 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/dimchansky/utfbom v1.1.1 // indirect
-	github.com/golang-jwt/jwt/v4 v4.3.0 // indirect
+	github.com/golang-jwt/jwt/v4 v4.4.0 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
@@ -37,6 +37,6 @@ require (
 	github.com/prometheus/procfs v0.7.3 // indirect
 	github.com/rickb777/plural v1.4.1 // indirect
 	github.com/stretchr/testify v1.5.1 // indirect
-	golang.org/x/sys v0.0.0-20220209214540-3681064d5158 // indirect
+	golang.org/x/sys v0.0.0-20220318055525-2edf467146b5 // indirect
 	google.golang.org/protobuf v1.27.1 // indirect
 )
