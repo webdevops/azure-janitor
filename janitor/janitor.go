@@ -77,6 +77,7 @@ var (
 func (j *Janitor) Init() {
 	j.initPrometheus()
 	j.initAzure()
+	j.initAuzreApiVersions()
 }
 
 func (j *Janitor) initAzure() {
@@ -124,12 +125,15 @@ func (j *Janitor) initPrometheus() {
 			Name: "azurejanitor_resources_ttl",
 			Help: "AzureJanitor resources with expiry time",
 		},
-		[]string{
-			"resourceID",
-			"subscriptionID",
-			"resourceGroup",
-			"provider",
-		},
+		append(
+			[]string{
+				"resourceID",
+				"subscriptionID",
+				"resourceGroup",
+				"resourceType",
+			},
+			stringListAddPrefix(j.Conf.Azure.ResourceTags, "tag_")...,
+		),
 	)
 	prometheus.MustRegister(j.Prometheus.MetricTtlResources)
 
@@ -173,8 +177,6 @@ func (j *Janitor) initPrometheus() {
 		},
 	)
 	prometheus.MustRegister(j.Prometheus.MetricErrors)
-
-	j.initAuzreApiVersions()
 }
 
 func (j *Janitor) Run() {
@@ -275,13 +277,17 @@ func (j *Janitor) initAuzreApiVersions() {
 	for _, subscription := range j.Azure.Subscriptions {
 		subscriptionId := *subscription.SubscriptionID
 
+		contextLogger := log.WithFields(log.Fields{
+			"subscription": subscriptionId,
+		})
+
 		// fetch location translation map
 		locationClient := subscriptions.NewClientWithBaseURI(j.Azure.Environment.ResourceManagerEndpoint)
 		j.decorateAzureAutorest(&locationClient.Client)
 
 		locationResult, err := locationClient.ListLocations(ctx, subscriptionId, nil)
 		if err != nil {
-			panic(err)
+			contextLogger.Panic(err)
 		}
 
 		locationMap := map[string]string{}
@@ -297,7 +303,7 @@ func (j *Janitor) initAuzreApiVersions() {
 
 		result, err := providersClient.ListComplete(ctx, nil, "")
 		if err != nil {
-			panic(err)
+			contextLogger.Panic(err)
 		}
 
 		j.apiVersionMap[subscriptionId] = map[string]string{}
@@ -367,7 +373,7 @@ func (j *Janitor) getAzureApiVersionForResourceType(subscriptionId, location, re
 		// location based apiVersion
 		apiVersion = val
 	} else if val, ok := j.apiVersionMap[subscriptionId][unknownKey]; ok {
-		// unknown location based apiVersion\
+		// unknown location based apiVersion
 		apiVersion = val
 	}
 	return

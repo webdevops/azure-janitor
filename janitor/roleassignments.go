@@ -10,6 +10,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	prometheusCommon "github.com/webdevops/go-prometheus-common"
+	prometheusAzure "github.com/webdevops/go-prometheus-common/azure"
 )
 
 func (j *Janitor) runRoleAssignments(ctx context.Context, subscription subscriptions.Subscription, filter string, ttlMetricsChan chan<- *prometheusCommon.MetricList) {
@@ -31,14 +32,16 @@ func (j *Janitor) runRoleAssignments(ctx context.Context, subscription subscript
 			continue
 		}
 
+		azureResource, _ := prometheusAzure.ParseResourceId(*roleAssignment.Scope)
+
 		roleAssignmentLogger := contextLogger.WithFields(log.Fields{
-			"roleAssignmentId": to.String(roleAssignment.ID),
-			"scope":            to.String(roleAssignment.Scope),
-			"principalId":      to.String(roleAssignment.PrincipalID),
-			"principalType":    string(roleAssignment.PrincipalType),
-			"roleDefinitionId": to.String(roleAssignment.RoleDefinitionID),
-			"subscriptionID":   to.String(subscription.SubscriptionID),
-			"resourceGroup":    extractResourceGroupFromAzureId(*roleAssignment.Scope),
+			"roleAssignmentId": stringPtrToStringLower(roleAssignment.ID),
+			"scope":            stringPtrToStringLower(roleAssignment.Scope),
+			"principalId":      stringPtrToStringLower(roleAssignment.PrincipalID),
+			"principalType":    stringToStringLower(string(roleAssignment.PrincipalType)),
+			"roleDefinitionId": stringPtrToStringLower(roleAssignment.RoleDefinitionID),
+			"subscriptionID":   stringPtrToStringLower(subscription.SubscriptionID),
+			"resourceGroup":    azureResource.ResourceGroup,
 		})
 
 		// check if RoleDefinitionID is set
@@ -65,20 +68,20 @@ func (j *Janitor) runRoleAssignments(ctx context.Context, subscription subscript
 				roleAssignmentTtl = &j.Conf.Janitor.RoleAssignments.Ttl
 			}
 
-			// calulate expiry and check if already expired
+			// calculate expiry and check if already expired
 			roleAssignmentExpiry := roleAssignment.CreatedOn.UTC().Add(*roleAssignmentTtl)
 			roleAssignmentExpired := time.Now().After(roleAssignmentExpiry)
 
 			roleAssignmentLogger.Debugf("detected ttl %v", roleAssignmentTtl.String())
 
 			resourceTtl.AddTime(prometheus.Labels{
-				"roleAssignmentId": to.String(roleAssignment.ID),
-				"scope":            to.String(roleAssignment.Scope),
-				"principalId":      to.String(roleAssignment.PrincipalID),
-				"principalType":    to.String(roleAssignment.Type),
-				"roleDefinitionId": to.String(roleAssignment.RoleDefinitionID),
-				"subscriptionID":   to.String(subscription.SubscriptionID),
-				"resourceGroup":    extractResourceGroupFromAzureId(*roleAssignment.Scope),
+				"roleAssignmentId": stringPtrToStringLower(roleAssignment.ID),
+				"scope":            stringPtrToStringLower(roleAssignment.Scope),
+				"principalId":      stringPtrToStringLower(roleAssignment.PrincipalID),
+				"principalType":    stringPtrToStringLower(roleAssignment.Type),
+				"roleDefinitionId": stringPtrToStringLower(roleAssignment.RoleDefinitionID),
+				"subscriptionID":   stringPtrToStringLower(subscription.SubscriptionID),
+				"resourceGroup":    azureResource.ResourceGroup,
 			}, roleAssignmentExpiry)
 
 			if roleAssignmentExpired {
@@ -89,16 +92,16 @@ func (j *Janitor) runRoleAssignments(ctx context.Context, subscription subscript
 						roleAssignmentLogger.Infof("successfully deleted")
 
 						j.Prometheus.MetricDeletedResource.With(prometheus.Labels{
-							"subscriptionID": to.String(subscription.SubscriptionID),
-							"resourceType":   resourceType,
+							"subscriptionID": stringPtrToStringLower(subscription.SubscriptionID),
+							"resourceType":   stringToStringLower(resourceType),
 						}).Inc()
 					} else {
 						// failed delete
 						roleAssignmentLogger.Errorf("ERROR %s", err)
 
 						j.Prometheus.MetricErrors.With(prometheus.Labels{
-							"subscriptionID": to.String(subscription.SubscriptionID),
-							"resourceType":   resourceType,
+							"subscriptionID": stringPtrToStringLower(subscription.SubscriptionID),
+							"resourceType":   stringToStringLower(resourceType),
 						}).Inc()
 					}
 				} else {

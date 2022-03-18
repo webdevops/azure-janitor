@@ -21,8 +21,9 @@ type (
 
 		// azure
 		Azure struct {
-			Environment  *string  `long:"azure-environment"    env:"AZURE_ENVIRONMENT"                description:"Azure environment name" default:"AZUREPUBLICCLOUD"`
-			Subscription []string `long:"azure-subscription"   env:"AZURE_SUBSCRIPTION_ID"  env-delim:" "  description:"Azure subscription ID"`
+			Environment  *string  `long:"azure.environment"    env:"AZURE_ENVIRONMENT"                description:"Azure environment name" default:"AZUREPUBLICCLOUD"`
+			Subscription []string `long:"azure.subscription"   env:"AZURE_SUBSCRIPTION_ID"  env-delim:" "  description:"Azure subscription ID"`
+			ResourceTags []string `long:"azure.resource.tags"  env:"AZURE_RESOURCE_TAGS"    env-delim:" "  description:"Azure resource labels to add as metric labels (space delimiter)"`
 		}
 
 		// janitor
@@ -46,8 +47,8 @@ type (
 
 			Deployments struct {
 				Enable bool          `long:"janitor.deployments"         env:"JANITOR_DEPLOYMENTS_ENABLE"  description:"Enable Azure Deployments cleanup"`
-				Ttl    time.Duration `long:"janitor.deployments.ttl"     env:"JANITOR_DEPLOYMENTS_TTL"  description:"Janitor deployment ttl (time.duration)"  default:"8760h"`
-				Limit  int64         `long:"janitor.deployments.limit"   env:"JANITOR_DEPLOYMENTS_LIMIT"  description:"Janitor deployment limit count (int)"  default:"700"`
+				Ttl    time.Duration `long:"janitor.deployments.ttl"     env:"JANITOR_DEPLOYMENTS_TTL"     description:"Janitor deployment ttl (time.duration)"  default:"8760h"`
+				Limit  int64         `long:"janitor.deployments.limit"   env:"JANITOR_DEPLOYMENTS_LIMIT"   description:"Janitor deployment limit count (int)"  default:"700"`
 			}
 
 			RoleAssignments struct {
@@ -56,7 +57,7 @@ type (
 				RoleDefintionIds     []string      `long:"janitor.roleassignments.roledefinitionid"   env:"JANITOR_ROLEASSIGNMENTS_ROLEDEFINITIONID"  env-delim:" " description:"Janitor roledefinition ID (eg: /subscriptions/xxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx/providers/Microsoft.Authorization/roleDefinitions/xxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx)"`
 				AdditionalFilter     *string       `long:"janitor.roleassignments.filter"             env:"JANITOR_ROLEASSIGNMENTS_FILTER"  description:"Additional $filter for Azure REST API for RoleAssignments"`
 				Filter               string
-				DescriptionTtl       *string `long:"janitor.roleassignments.descriptionttl"             env:"JANITOR_ROLEASSIGNMENTS_DESCRIPTIONTTL"  description:"Regexp for detecting ttl inside description of RoleAssignment"`
+				DescriptionTtl       *string `long:"janitor.roleassignments.descriptionttl"           env:"JANITOR_ROLEASSIGNMENTS_DESCRIPTIONTTL"  description:"Regexp for detecting ttl inside description of RoleAssignment"`
 				DescriptionTtlRegExp *regexp.Regexp
 			}
 		}

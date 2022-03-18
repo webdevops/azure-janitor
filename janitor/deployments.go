@@ -6,6 +6,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/profiles/2020-09-01/resources/mgmt/resources"
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/resources/mgmt/subscriptions"
+	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	prometheusCommon "github.com/webdevops/go-prometheus-common"
@@ -34,7 +35,7 @@ func (j *Janitor) runDeployments(ctx context.Context, subscription subscriptions
 		deploymentCounter = 0
 		deploymentFinalCounter = 0
 
-		resourceLogger := contextLogger.WithField("resource", *resourceGroup.ID)
+		resourceLogger := contextLogger.WithField("resource", to.String(resourceGroup.ID))
 
 		deploymentResult, err := deploymentClient.ListByResourceGroupComplete(ctx, *resourceGroup.Name, "", nil)
 		if err != nil {
@@ -57,21 +58,21 @@ func (j *Janitor) runDeployments(ctx context.Context, subscription subscriptions
 			}
 
 			if !j.Conf.DryRun && deleteDeployment {
-				if _, err := deploymentClient.Delete(ctx, *resourceGroup.Name, *deployment.Name); err == nil {
+				if _, err := deploymentClient.Delete(ctx, to.String(resourceGroup.Name), to.String(deployment.Name)); err == nil {
 					// successfully deleted
-					resourceLogger.Infof("%s: successfully deleted", *deployment.ID)
+					resourceLogger.Infof("%s: successfully deleted", to.String(deployment.ID))
 
 					j.Prometheus.MetricDeletedResource.With(prometheus.Labels{
-						"subscriptionID": *subscription.SubscriptionID,
-						"resourceType":   resourceType,
+						"subscriptionID": stringPtrToStringLower(subscription.SubscriptionID),
+						"resourceType":   stringToStringLower(resourceType),
 					}).Inc()
 				} else {
 					// failed delete
-					resourceLogger.Errorf("%s: ERROR %s", *deployment.ID, err)
+					resourceLogger.Errorf("%s: ERROR %s", to.String(deployment.ID), err)
 
 					j.Prometheus.MetricErrors.With(prometheus.Labels{
-						"subscriptionID": *subscription.SubscriptionID,
-						"resourceType":   resourceType,
+						"subscriptionID": stringPtrToStringLower(subscription.SubscriptionID),
+						"resourceType":   stringToStringLower(resourceType),
 					}).Inc()
 				}
 			} else {

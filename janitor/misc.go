@@ -1,29 +1,16 @@
 package janitor
 
 import (
-	"regexp"
 	"strings"
+
+	"github.com/Azure/go-autorest/autorest/to"
 )
 
-var (
-	resourceGroupFromResourceIdRegExp = regexp.MustCompile("/resourceGroups/([^/]*)")
-	providerFromResourceIdRegExp      = regexp.MustCompile("/providers/([^/]*)")
-)
-
-func extractResourceGroupFromAzureId(azureId string) (resourceGroup string) {
-	if subMatch := resourceGroupFromResourceIdRegExp.FindStringSubmatch(azureId); len(subMatch) >= 1 {
-		resourceGroup = strings.ToLower(subMatch[1])
-	}
-
-	return
+func stringPtrToStringLower(val *string) string {
+	return strings.ToLower(to.String(val))
 }
-
-func extractProviderFromAzureId(azureId string) (provider string) {
-	if subMatch := providerFromResourceIdRegExp.FindStringSubmatch(azureId); len(subMatch) >= 1 {
-		provider = subMatch[1]
-	}
-
-	return
+func stringToStringLower(val string) string {
+	return strings.ToLower(val)
 }
 
 func stringInSlice(a string, list []string) bool {
@@ -33,4 +20,12 @@ func stringInSlice(a string, list []string) bool {
 		}
 	}
 	return false
+}
+
+func stringListAddPrefix(list []string, prefix string) []string {
+	ret := []string{}
+	for _, val := range list {
+		ret = append(ret, prefix+val)
+	}
+	return ret
 }

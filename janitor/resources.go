@@ -9,6 +9,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	prometheusCommon "github.com/webdevops/go-prometheus-common"
+	prometheusAzure "github.com/webdevops/go-prometheus-common/azure"
 )
 
 func (j *Janitor) runResources(ctx context.Context, subscription subscriptions.Subscription, filter string, ttlMetricsChan chan<- *prometheusCommon.MetricList) {
@@ -29,7 +30,7 @@ func (j *Janitor) runResources(ctx context.Context, subscription subscriptions.S
 		resourceTypeApiVersion := j.getAzureApiVersionForResourceType(*subscription.SubscriptionID, to.String(resource.Location), resourceType)
 
 		resourceLogger := contextLogger.WithFields(log.Fields{
-			"resource":   *resource.ID,
+			"resource":   to.String(resource.ID),
 			"location":   to.String(resource.Location),
 			"apiVersion": resourceTypeApiVersion,
 		})
@@ -38,8 +39,8 @@ func (j *Janitor) runResources(ctx context.Context, subscription subscriptions.S
 			resourceLogger.Errorf("unable to detect apiVersion for Azure resource, cannot delete resource (please report this issue as bug)")
 
 			j.Prometheus.MetricErrors.With(prometheus.Labels{
-				"subscriptionID": *subscription.SubscriptionID,
-				"resourceType":   resourceType,
+				"subscriptionID": stringPtrToStringLower(subscription.SubscriptionID),
+				"resourceType":   stringToStringLower(resourceType),
 			}).Inc()
 
 			continue
@@ -48,13 +49,17 @@ func (j *Janitor) runResources(ctx context.Context, subscription subscriptions.S
 		if resourceTypeApiVersion != "" && resource.Tags != nil {
 			resourceExpiryTime, resourceExpired, resourceTagUpdateNeeded := j.checkAzureResourceExpiry(resourceLogger, resourceType, *resource.ID, &resource.Tags)
 
+			azureResource, _ := prometheusAzure.ParseResourceId(*resource.ID)
+
 			if resourceExpiryTime != nil {
-				resourceTtl.AddTime(prometheus.Labels{
-					"subscriptionID": *subscription.SubscriptionID,
-					"resourceID":     *resource.ID,
-					"resourceGroup":  extractResourceGroupFromAzureId(*resource.ID),
-					"provider":       extractProviderFromAzureId(*resource.ID),
-				}, *resourceExpiryTime)
+				labels := prometheus.Labels{
+					"subscriptionID": stringPtrToStringLower(subscription.SubscriptionID),
+					"resourceID":     stringPtrToStringLower(resource.ID),
+					"resourceGroup":  azureResource.ResourceGroup,
+					"resourceType":   azureResource.ResourceType,
+				}
+				labels = prometheusAzure.AddResourceTagsToPrometheusLabels(labels, resource.Tags, j.Conf.Azure.ResourceTags)
+				resourceTtl.AddTime(labels, *resourceExpiryTime)
 			}
 
 			if !j.Conf.DryRun && resourceTagUpdateNeeded {

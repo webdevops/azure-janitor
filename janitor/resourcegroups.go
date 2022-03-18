@@ -5,9 +5,11 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/profiles/2020-09-01/resources/mgmt/resources"
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/resources/mgmt/subscriptions"
+	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	prometheusCommon "github.com/webdevops/go-prometheus-common"
+	prometheusAzure "github.com/webdevops/go-prometheus-common/azure"
 )
 
 func (j *Janitor) runResourceGroups(ctx context.Context, subscription subscriptions.Subscription, filter string, ttlMetricsChan chan<- *prometheusCommon.MetricList) {
@@ -25,18 +27,20 @@ func (j *Janitor) runResourceGroups(ctx context.Context, subscription subscripti
 	}
 
 	for _, resourceGroup := range *resourceGroupResult.Response().Value {
-		resourceLogger := contextLogger.WithField("resource", *resourceGroup.ID)
+		resourceLogger := contextLogger.WithField("resource", to.String(resourceGroup.ID))
 
 		if resourceGroup.Tags != nil {
 			resourceExpiryTime, resourceExpired, resourceTagUpdateNeeded := j.checkAzureResourceExpiry(resourceLogger, resourceType, *resourceGroup.ID, &resourceGroup.Tags)
 
 			if resourceExpiryTime != nil {
-				resourceTtl.AddTime(prometheus.Labels{
-					"subscriptionID": *subscription.SubscriptionID,
-					"resourceID":     *resourceGroup.ID,
-					"resourceGroup":  *resourceGroup.Name,
-					"provider":       resourceType,
-				}, *resourceExpiryTime)
+				labels := prometheus.Labels{
+					"subscriptionID": stringPtrToStringLower(subscription.SubscriptionID),
+					"resourceID":     stringPtrToStringLower(resourceGroup.ID),
+					"resourceGroup":  stringPtrToStringLower(resourceGroup.Name),
+					"resourceType":   stringToStringLower(resourceType),
+				}
+				labels = prometheusAzure.AddResourceTagsToPrometheusLabels(labels, resourceGroup.Tags, j.Conf.Azure.ResourceTags)
+				resourceTtl.AddTime(labels, *resourceExpiryTime)
 			}
 
 			if !j.Conf.DryRun && resourceTagUpdateNeeded {
@@ -53,7 +57,7 @@ func (j *Janitor) runResourceGroups(ctx context.Context, subscription subscripti
 					resourceLogger.Errorf("ERROR %s", err)
 
 					j.Prometheus.MetricErrors.With(prometheus.Labels{
-						"resourceType": resourceType,
+						"resourceType": stringToStringLower(resourceType),
 					}).Inc()
 				}
 			}
@@ -65,16 +69,16 @@ func (j *Janitor) runResourceGroups(ctx context.Context, subscription subscripti
 					resourceLogger.Infof("successfully deleted")
 
 					j.Prometheus.MetricDeletedResource.With(prometheus.Labels{
-						"subscriptionID": *subscription.SubscriptionID,
-						"resourceType":   resourceType,
+						"subscriptionID": stringPtrToStringLower(subscription.SubscriptionID),
+						"resourceType":   stringToStringLower(resourceType),
 					}).Inc()
 				} else {
 					// failed delete
 					resourceLogger.Errorf("ERROR %s", err)
 
 					j.Prometheus.MetricErrors.With(prometheus.Labels{
-						"subscriptionID": *subscription.SubscriptionID,
-						"resourceType":   resourceType,
+						"subscriptionID": stringPtrToStringLower(subscription.SubscriptionID),
+						"resourceType":   stringToStringLower(resourceType),
 					}).Inc()
 				}
 			}
