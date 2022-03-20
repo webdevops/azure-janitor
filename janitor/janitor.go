@@ -17,6 +17,7 @@ import (
 	"github.com/rickb777/date/period"
 	log "github.com/sirupsen/logrus"
 	prometheusCommon "github.com/webdevops/go-prometheus-common"
+	prometheusAzure "github.com/webdevops/go-prometheus-common/azure"
 	"github.com/webdevops/go-prometheus-common/azuretracing"
 
 	"github.com/webdevops/azure-janitor/config"
@@ -125,14 +126,14 @@ func (j *Janitor) initPrometheus() {
 			Name: "azurejanitor_resources_ttl",
 			Help: "AzureJanitor resources with expiry time",
 		},
-		append(
+		prometheusAzure.AddResourceTagsToPrometheusLabelsDefinition(
 			[]string{
 				"resourceID",
 				"subscriptionID",
 				"resourceGroup",
 				"resourceType",
 			},
-			stringListAddPrefix(j.Conf.Azure.ResourceTags, "tag_")...,
+			j.Conf.Azure.ResourceTags,
 		),
 	)
 	prometheus.MustRegister(j.Prometheus.MetricTtlResources)
