@@ -24,8 +24,10 @@ Application Options:
       --debug                                     debug mode [$DEBUG]
   -v, --verbose                                   verbose mode [$VERBOSE]
       --log.json                                  Switch log output to json format [$LOG_JSON]
-      --azure-environment=                        Azure environment name (default: AZUREPUBLICCLOUD) [$AZURE_ENVIRONMENT]
-      --azure-subscription=                       Azure subscription ID [$AZURE_SUBSCRIPTION_ID]
+      --azure.environment=                        Azure environment name (default: AZUREPUBLICCLOUD) [$AZURE_ENVIRONMENT]
+      --azure.subscription=                       Azure subscription ID (space delimiter) [$AZURE_SUBSCRIPTION_ID]
+      --azure.resource.tags=                      Azure resource labels to add as metric labels (space delimiter)
+                                                  [$AZURE_RESOURCE_TAGS]
       --janitor.interval=                         Janitor interval (time.duration) (default: 1h) [$JANITOR_INTERVAL]
       --janitor.tag=                              Janitor azure tag (string) (default: ttl) [$JANITOR_TAG]
       --janitor.tag.target=                       Janitor azure tag (string) (default: ttl_expiry) [$JANITOR_TAG_TARGET]
@@ -33,19 +35,16 @@ Application Options:
       --janitor.resourcegroups.filter=            Additional $filter for Azure REST API for ResourceGroups
                                                   [$JANITOR_RESOURCEGROUPS_FILTER]
       --janitor.resources                         Enable Azure Resources cleanup [$JANITOR_RESOURCES_ENABLE]
-      --janitor.resources.filter=                 Additional $filter for Azure REST API for Resources
-                                                  [$JANITOR_RESOURCES_FILTER]
+      --janitor.resources.filter=                 Additional $filter for Azure REST API for Resources [$JANITOR_RESOURCES_FILTER]
       --janitor.deployments                       Enable Azure Deployments cleanup [$JANITOR_DEPLOYMENTS_ENABLE]
-      --janitor.deployments.ttl=                  Janitor deployment ttl (time.duration) (default: 8760h)
-                                                  [$JANITOR_DEPLOYMENTS_TTL]
-      --janitor.deployments.limit=                Janitor deployment limit count (int) (default: 700)
-                                                  [$JANITOR_DEPLOYMENTS_LIMIT]
+      --janitor.deployments.ttl=                  Janitor deployment ttl (time.duration) (default: 8760h) [$JANITOR_DEPLOYMENTS_TTL]
+      --janitor.deployments.limit=                Janitor deployment limit count (int) (default: 700) [$JANITOR_DEPLOYMENTS_LIMIT]
       --janitor.roleassignments                   Enable Azure RoleAssignments cleanup [$JANITOR_ROLEASSIGNMENTS_ENABLE]
       --janitor.roleassignments.ttl=              Janitor roleassignment ttl (time.duration) (default: 6h)
                                                   [$JANITOR_ROLEASSIGNMENTS_TTL]
       --janitor.roleassignments.roledefinitionid= Janitor roledefinition ID (eg:
-                                                  /subscriptions/xxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx/providers/Microsoft.Author-
-                                                  ization/roleDefinitions/xxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx)
+                                                  /subscriptions/xxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx/providers/Microsoft.Authorization/-
+                                                  roleDefinitions/xxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx)  (space delimiter)
                                                   [$JANITOR_ROLEASSIGNMENTS_ROLEDEFINITIONID]
       --janitor.roleassignments.filter=           Additional $filter for Azure REST API for RoleAssignments
                                                   [$JANITOR_ROLEASSIGNMENTS_FILTER]
@@ -237,6 +236,17 @@ Using absolute calculated time:
 | `azurejanitor_roleassignment_ttl`              | Gauge        | List of Azure RoleAssignments with expiry timestamp as value                          |
 | `azurejanitor_resources_deleted`               | Counter      | Number of deleted resources (by resource type)                                        |
 | `azurejanitor_errors`                          | Counter      | Number of failed deleted resources (by resource type)                                 |
+
+### ResourceTags handling
+
+Tag can be dynamically added to metrics and processed though filters
+
+format is: `tagname?filter1` or `tagname?filter1&filter2`
+
+| Tag filter | Description                 |
+|------------|-----------------------------|
+| `toLower`  | Lowercasing Azure tag value |
+| `toUpper`  | Uppercasing Azure tag value |
 
 ### AzureTracing metrics
 
