@@ -8,8 +8,8 @@ import (
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
-	prometheusCommon "github.com/webdevops/go-prometheus-common"
-	prometheusAzure "github.com/webdevops/go-prometheus-common/azure"
+	azureCommon "github.com/webdevops/go-common/azure"
+	prometheusCommon "github.com/webdevops/go-common/prometheus"
 )
 
 func (j *Janitor) runResourceGroups(ctx context.Context, subscription subscriptions.Subscription, filter string, ttlMetricsChan chan<- *prometheusCommon.MetricList) {
@@ -39,7 +39,7 @@ func (j *Janitor) runResourceGroups(ctx context.Context, subscription subscripti
 					"resourceGroup":  stringPtrToStringLower(resourceGroup.Name),
 					"resourceType":   stringToStringLower(resourceType),
 				}
-				labels = prometheusAzure.AddResourceTagsToPrometheusLabels(labels, resourceGroup.Tags, j.Conf.Azure.ResourceTags)
+				labels = azureCommon.AddResourceTagsToPrometheusLabels(labels, resourceGroup.Tags, j.Conf.Azure.ResourceTags)
 				resourceTtl.AddTime(labels, *resourceExpiryTime)
 			}
 

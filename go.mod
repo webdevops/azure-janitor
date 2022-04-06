@@ -3,7 +3,7 @@ module github.com/webdevops/azure-janitor
 go 1.17
 
 require (
-	github.com/Azure/azure-sdk-for-go v62.2.0+incompatible
+	github.com/Azure/azure-sdk-for-go v63.1.0+incompatible
 	github.com/Azure/go-autorest/autorest v0.11.24
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.11
 	github.com/Azure/go-autorest/autorest/to v0.4.0
@@ -14,9 +14,10 @@ require (
 	github.com/prometheus/common v0.32.1 // indirect
 	github.com/rickb777/date v1.17.0
 	github.com/sirupsen/logrus v1.8.1
-	github.com/webdevops/go-prometheus-common v0.0.0-20220320154332-65dd393b5fb6
 	golang.org/x/crypto v0.0.0-20220315160706-3147a52a75dd // indirect
 )
+
+require github.com/webdevops/go-common v0.0.0-20220406110653-237539a358b2
 
 require (
 	github.com/Azure/go-autorest v14.2.0+incompatible // indirect

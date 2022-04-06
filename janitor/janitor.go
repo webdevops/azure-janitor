@@ -16,9 +16,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rickb777/date/period"
 	log "github.com/sirupsen/logrus"
-	prometheusCommon "github.com/webdevops/go-prometheus-common"
-	prometheusAzure "github.com/webdevops/go-prometheus-common/azure"
-	"github.com/webdevops/go-prometheus-common/azuretracing"
+	azureCommon "github.com/webdevops/go-common/azure"
+	prometheusCommon "github.com/webdevops/go-common/prometheus"
+	"github.com/webdevops/go-common/prometheus/azuretracing"
 
 	"github.com/webdevops/azure-janitor/config"
 )
@@ -126,7 +126,7 @@ func (j *Janitor) initPrometheus() {
 			Name: "azurejanitor_resources_ttl",
 			Help: "AzureJanitor resources with expiry time",
 		},
-		prometheusAzure.AddResourceTagsToPrometheusLabelsDefinition(
+		azureCommon.AddResourceTagsToPrometheusLabelsDefinition(
 			[]string{
 				"resourceID",
 				"subscriptionID",

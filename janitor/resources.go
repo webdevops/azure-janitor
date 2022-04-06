@@ -8,8 +8,8 @@ import (
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
-	prometheusCommon "github.com/webdevops/go-prometheus-common"
-	prometheusAzure "github.com/webdevops/go-prometheus-common/azure"
+	azureCommon "github.com/webdevops/go-common/azure"
+	prometheusCommon "github.com/webdevops/go-common/prometheus"
 )
 
 func (j *Janitor) runResources(ctx context.Context, subscription subscriptions.Subscription, filter string, ttlMetricsChan chan<- *prometheusCommon.MetricList) {
@@ -49,7 +49,7 @@ func (j *Janitor) runResources(ctx context.Context, subscription subscriptions.S
 		if resourceTypeApiVersion != "" && resource.Tags != nil {
 			resourceExpiryTime, resourceExpired, resourceTagUpdateNeeded := j.checkAzureResourceExpiry(resourceLogger, resourceType, *resource.ID, &resource.Tags)
 
-			azureResource, _ := prometheusAzure.ParseResourceId(*resource.ID)
+			azureResource, _ := azureCommon.ParseResourceId(*resource.ID)
 
 			if resourceExpiryTime != nil {
 				labels := prometheus.Labels{
@@ -58,7 +58,7 @@ func (j *Janitor) runResources(ctx context.Context, subscription subscriptions.S
 					"resourceGroup":  azureResource.ResourceGroup,
 					"resourceType":   azureResource.ResourceType,
 				}
-				labels = prometheusAzure.AddResourceTagsToPrometheusLabels(labels, resource.Tags, j.Conf.Azure.ResourceTags)
+				labels = azureCommon.AddResourceTagsToPrometheusLabels(labels, resource.Tags, j.Conf.Azure.ResourceTags)
 				resourceTtl.AddTime(labels, *resourceExpiryTime)
 			}
 
