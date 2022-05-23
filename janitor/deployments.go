@@ -12,23 +12,23 @@ import (
 	prometheusCommon "github.com/webdevops/go-common/prometheus"
 )
 
-func (j *Janitor) runDeployments(ctx context.Context, subscription subscriptions.Subscription, ttlMetricsChan chan<- *prometheusCommon.MetricList) {
+func (j *Janitor) runDeployments(ctx context.Context, logger *log.Entry, subscription subscriptions.Subscription, ttlMetricsChan chan<- *prometheusCommon.MetricList) {
 	var deploymentCounter, deploymentFinalCounter int64
-	contextLogger := log.WithField("task", "deployment")
+	contextLogger := logger.WithField("task", "deployment")
 
-	client := resources.NewGroupsClientWithBaseURI(j.Azure.Environment.ResourceManagerEndpoint, *subscription.SubscriptionID)
+	client := resources.NewGroupsClientWithBaseURI(j.Azure.Client.Environment.ResourceManagerEndpoint, *subscription.SubscriptionID)
 	j.decorateAzureAutorest(&client.Client)
 
 	resourceTtl := prometheusCommon.NewMetricsList()
 
-	deploymentClient := resources.NewDeploymentsClientWithBaseURI(j.Azure.Environment.ResourceManagerEndpoint, *subscription.SubscriptionID)
+	deploymentClient := resources.NewDeploymentsClientWithBaseURI(j.Azure.Client.Environment.ResourceManagerEndpoint, *subscription.SubscriptionID)
 	j.decorateAzureAutorest(&deploymentClient.Client)
 
 	resourceType := "Microsoft.Resources/deployments"
 
 	resourceGroupResult, err := client.ListComplete(ctx, "", nil)
 	if err != nil {
-		panic(err)
+		panic(err.Error())
 	}
 
 	for _, resourceGroup := range *resourceGroupResult.Response().Value {
@@ -39,7 +39,7 @@ func (j *Janitor) runDeployments(ctx context.Context, subscription subscriptions
 
 		deploymentResult, err := deploymentClient.ListByResourceGroupComplete(ctx, *resourceGroup.Name, "", nil)
 		if err != nil {
-			panic(err)
+			panic(err.Error())
 		}
 
 		for _, deployment := range *deploymentResult.Response().Value {
@@ -68,7 +68,7 @@ func (j *Janitor) runDeployments(ctx context.Context, subscription subscriptions
 					}).Inc()
 				} else {
 					// failed delete
-					resourceLogger.Errorf("%s: ERROR %s", to.String(deployment.ID), err)
+					resourceLogger.Errorf("%s: ERROR %s", to.String(deployment.ID), err.Error())
 
 					j.Prometheus.MetricErrors.With(prometheus.Labels{
 						"subscriptionID": stringPtrToStringLower(subscription.SubscriptionID),

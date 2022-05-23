@@ -12,10 +12,10 @@ import (
 	prometheusCommon "github.com/webdevops/go-common/prometheus"
 )
 
-func (j *Janitor) runResources(ctx context.Context, subscription subscriptions.Subscription, filter string, ttlMetricsChan chan<- *prometheusCommon.MetricList) {
-	contextLogger := log.WithField("task", "resource")
+func (j *Janitor) runResources(ctx context.Context, logger *log.Entry, subscription subscriptions.Subscription, filter string, ttlMetricsChan chan<- *prometheusCommon.MetricList) {
+	contextLogger := logger.WithField("task", "resource")
 
-	client := resources.NewClientWithBaseURI(j.Azure.Environment.ResourceManagerEndpoint, *subscription.SubscriptionID)
+	client := resources.NewClientWithBaseURI(j.Azure.Client.Environment.ResourceManagerEndpoint, *subscription.SubscriptionID)
 	j.decorateAzureAutorest(&client.Client)
 
 	resourceTtl := prometheusCommon.NewMetricsList()

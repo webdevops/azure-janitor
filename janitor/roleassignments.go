@@ -13,18 +13,18 @@ import (
 	prometheusCommon "github.com/webdevops/go-common/prometheus"
 )
 
-func (j *Janitor) runRoleAssignments(ctx context.Context, subscription subscriptions.Subscription, filter string, ttlMetricsChan chan<- *prometheusCommon.MetricList) {
-	contextLogger := log.WithField("task", "roleAssignment")
+func (j *Janitor) runRoleAssignments(ctx context.Context, logger *log.Entry, subscription subscriptions.Subscription, filter string, ttlMetricsChan chan<- *prometheusCommon.MetricList) {
+	contextLogger := logger.WithField("task", "roleAssignment")
 
 	resourceTtl := prometheusCommon.NewMetricsList()
 	resourceType := "Microsoft.Authorization/roleAssignments"
 
-	client := authorization.NewRoleAssignmentsClientWithBaseURI(j.Azure.Environment.ResourceManagerEndpoint, *subscription.SubscriptionID)
+	client := authorization.NewRoleAssignmentsClientWithBaseURI(j.Azure.Client.Environment.ResourceManagerEndpoint, *subscription.SubscriptionID)
 	j.decorateAzureAutorest(&client.Client)
 
 	result, err := client.ListComplete(ctx, filter, "")
 	if err != nil {
-		panic(err)
+		panic(err.Error())
 	}
 
 	for _, roleAssignment := range *result.Response().Value {
@@ -97,7 +97,7 @@ func (j *Janitor) runRoleAssignments(ctx context.Context, subscription subscript
 						}).Inc()
 					} else {
 						// failed delete
-						roleAssignmentLogger.Errorf("ERROR %s", err)
+						roleAssignmentLogger.Error(err.Error())
 
 						j.Prometheus.MetricErrors.With(prometheus.Labels{
 							"subscriptionID": stringPtrToStringLower(subscription.SubscriptionID),

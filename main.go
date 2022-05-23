@@ -9,12 +9,10 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/Azure/go-autorest/autorest"
-	"github.com/Azure/go-autorest/autorest/azure"
-	"github.com/Azure/go-autorest/autorest/azure/auth"
 	"github.com/jessevdk/go-flags"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
+	azureCommon "github.com/webdevops/go-common/azure"
 	"github.com/webdevops/go-common/prometheus/azuretracing"
 
 	"github.com/webdevops/azure-janitor/config"
@@ -31,9 +29,7 @@ var (
 	argparser *flags.Parser
 	opts      config.Opts
 
-	azureAuthorizer autorest.Authorizer
-
-	azureEnvironment azure.Environment //nolint:golint,unused
+	AzureClient *azureCommon.Client
 
 	// Git version information
 	gitCommit = "<unknown>"
@@ -54,8 +50,8 @@ func main() {
 		Conf:      opts,
 		UserAgent: UserAgent + gitTag,
 		Azure: janitor.JanitorAzureConfig{
-			Authorizer:  azureAuthorizer,
-			Environment: azureEnvironment,
+			Client:       AzureClient,
+			Subscription: opts.Azure.Subscription,
 		},
 	}
 	j.Init()
@@ -176,27 +172,27 @@ func checkForDeprecations() {
 	}
 }
 
-// Init and build Azure authorzier
 func initAzureConnection() {
 	var err error
-
-	// get environment
-	azureEnvironment, err = azure.EnvironmentFromName(*opts.Azure.Environment)
+	AzureClient, err = azureCommon.NewClientFromEnvironment(*opts.Azure.Environment, log.StandardLogger())
 	if err != nil {
-		log.Panic(err)
+		log.Panic(err.Error())
 	}
 
-	// setup azure authorizer
-	azureAuthorizer, err = auth.NewAuthorizerFromEnvironment()
-	if err != nil {
-		panic(err)
-	}
+	AzureClient.SetUserAgent(UserAgent + gitTag)
 }
 
 // start and handle prometheus handler
 func startHttpServer() {
 	// healthz
 	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		if _, err := fmt.Fprint(w, "Ok"); err != nil {
+			log.Error(err)
+		}
+	})
+
+	// readyz
+	http.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
 		if _, err := fmt.Fprint(w, "Ok"); err != nil {
 			log.Error(err)
 		}

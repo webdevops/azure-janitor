@@ -12,18 +12,18 @@ import (
 	prometheusCommon "github.com/webdevops/go-common/prometheus"
 )
 
-func (j *Janitor) runResourceGroups(ctx context.Context, subscription subscriptions.Subscription, filter string, ttlMetricsChan chan<- *prometheusCommon.MetricList) {
-	contextLogger := log.WithField("task", "resourceGroup")
+func (j *Janitor) runResourceGroups(ctx context.Context, logger *log.Entry, subscription subscriptions.Subscription, filter string, ttlMetricsChan chan<- *prometheusCommon.MetricList) {
+	contextLogger := logger.WithField("task", "resourceGroup")
 	resourceType := "Microsoft.Resources/resourceGroups"
 
-	client := resources.NewGroupsClientWithBaseURI(j.Azure.Environment.ResourceManagerEndpoint, *subscription.SubscriptionID)
+	client := resources.NewGroupsClientWithBaseURI(j.Azure.Client.Environment.ResourceManagerEndpoint, *subscription.SubscriptionID)
 	j.decorateAzureAutorest(&client.Client)
 
 	resourceTtl := prometheusCommon.NewMetricsList()
 
 	resourceGroupResult, err := client.ListComplete(ctx, filter, nil)
 	if err != nil {
-		panic(err)
+		panic(err.Error())
 	}
 
 	for _, resourceGroup := range *resourceGroupResult.Response().Value {
@@ -54,7 +54,7 @@ func (j *Janitor) runResourceGroups(ctx context.Context, subscription subscripti
 					resourceLogger.Infof("successfully updated")
 				} else {
 					// failed delete
-					resourceLogger.Errorf("ERROR %s", err)
+					resourceLogger.Errorf("ERROR %s", err.Error())
 
 					j.Prometheus.MetricErrors.With(prometheus.Labels{
 						"resourceType": stringToStringLower(resourceType),
@@ -74,7 +74,7 @@ func (j *Janitor) runResourceGroups(ctx context.Context, subscription subscripti
 					}).Inc()
 				} else {
 					// failed delete
-					resourceLogger.Errorf("ERROR %s", err)
+					resourceLogger.Error(err.Error())
 
 					j.Prometheus.MetricErrors.With(prometheus.Labels{
 						"subscriptionID": stringPtrToStringLower(subscription.SubscriptionID),

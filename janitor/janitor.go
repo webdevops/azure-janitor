@@ -10,7 +10,6 @@ import (
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/resources/mgmt/resources"
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/resources/mgmt/subscriptions"
 	"github.com/Azure/go-autorest/autorest"
-	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/to"
 	tparse "github.com/karrick/tparse/v2"
 	"github.com/prometheus/client_golang/prometheus"
@@ -18,7 +17,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	azureCommon "github.com/webdevops/go-common/azure"
 	prometheusCommon "github.com/webdevops/go-common/prometheus"
-	"github.com/webdevops/go-common/prometheus/azuretracing"
 
 	"github.com/webdevops/azure-janitor/config"
 )
@@ -46,9 +44,8 @@ type (
 	}
 
 	JanitorAzureConfig struct {
-		Authorizer    autorest.Authorizer
-		Subscriptions []subscriptions.Subscription
-		Environment   azure.Environment
+		Client       *azureCommon.Client
+		Subscription []string
 	}
 )
 
@@ -77,38 +74,7 @@ var (
 
 func (j *Janitor) Init() {
 	j.initPrometheus()
-	j.initAzure()
 	j.initAuzreApiVersions()
-}
-
-func (j *Janitor) initAzure() {
-	ctx := context.Background()
-	j.Azure.Subscriptions = []subscriptions.Subscription{}
-
-	client := subscriptions.NewClientWithBaseURI(j.Azure.Environment.ResourceManagerEndpoint)
-	j.decorateAzureAutorest(&client.Client)
-
-	if len(j.Conf.Azure.Subscription) == 0 {
-		// auto lookup subscriptions
-		listResult, err := client.List(ctx)
-		if err != nil {
-			panic(err)
-		}
-		j.Azure.Subscriptions = listResult.Values()
-
-		if len(j.Azure.Subscriptions) == 0 {
-			log.Panic("no Azure Subscriptions found via auto detection, does this ServicePrincipal have read permissions to the subcriptions?")
-		}
-	} else {
-		// fixed subscription list
-		for _, subId := range j.Conf.Azure.Subscription {
-			result, err := client.Get(ctx, subId)
-			if err != nil {
-				panic(err)
-			}
-			j.Azure.Subscriptions = append(j.Azure.Subscriptions, result)
-		}
-	}
 }
 
 func (j *Janitor) initPrometheus() {
@@ -180,13 +146,23 @@ func (j *Janitor) initPrometheus() {
 	prometheus.MustRegister(j.Prometheus.MetricErrors)
 }
 
+func (j *Janitor) subscriptionList(ctx context.Context) []subscriptions.Subscription {
+	subscriptionList, err := j.Azure.Client.ListCachedSubscriptionsWithFilter(ctx, j.Azure.Subscription...)
+	if err != nil {
+		log.Panic(err.Error())
+	}
+	return subscriptionList
+}
+
 func (j *Janitor) Run() {
 	ctx := context.Background()
 
 	go func() {
 		for {
+			runLogger := log.WithFields(log.Fields{})
+
 			startTime := time.Now()
-			log.Infof("start janitor run")
+			runLogger.Infof("start janitor run")
 			var wgMain sync.WaitGroup
 			var wgMetrics sync.WaitGroup
 
@@ -194,28 +170,38 @@ func (j *Janitor) Run() {
 			callbackTtlRoleAssignmentsMetrics := make(chan *prometheusCommon.MetricList)
 
 			// subscription processing
-			for _, subscription := range j.Azure.Subscriptions {
-				wgMain.Add(1)
-				go func(subscription subscriptions.Subscription) {
-					defer wgMain.Done()
+			go func() {
+				for _, subscription := range j.subscriptionList(ctx) {
+					wgMain.Add(1)
+					go func(subscription subscriptions.Subscription) {
+						defer wgMain.Done()
 
-					if j.Conf.Janitor.ResourceGroups.Enable {
-						j.runResourceGroups(ctx, subscription, j.Conf.Janitor.ResourceGroups.Filter, callbackTtlResourcesMetrics)
-					}
+						contextLogger := runLogger.WithFields(log.Fields{
+							"subscriptionID":   to.String(subscription.SubscriptionID),
+							"subscriptionName": to.String(subscription.DisplayName),
+						})
 
-					if j.Conf.Janitor.Resources.Enable {
-						j.runResources(ctx, subscription, j.Conf.Janitor.Resources.Filter, callbackTtlResourcesMetrics)
-					}
+						if j.Conf.Janitor.Deployments.Enable {
+							j.runDeployments(ctx, contextLogger, subscription, callbackTtlResourcesMetrics)
+						}
 
-					if j.Conf.Janitor.Deployments.Enable {
-						j.runDeployments(ctx, subscription, callbackTtlResourcesMetrics)
-					}
+						if j.Conf.Janitor.Resources.Enable {
+							j.runResources(ctx, contextLogger, subscription, j.Conf.Janitor.Resources.Filter, callbackTtlResourcesMetrics)
+						}
 
-					if j.Conf.Janitor.RoleAssignments.Enable {
-						j.runRoleAssignments(ctx, subscription, j.Conf.Janitor.RoleAssignments.Filter, callbackTtlRoleAssignmentsMetrics)
-					}
-				}(subscription)
-			}
+						if j.Conf.Janitor.RoleAssignments.Enable {
+							j.runRoleAssignments(ctx, contextLogger, subscription, j.Conf.Janitor.RoleAssignments.Filter, callbackTtlRoleAssignmentsMetrics)
+						}
+
+						if j.Conf.Janitor.ResourceGroups.Enable {
+							j.runResourceGroups(ctx, contextLogger, subscription, j.Conf.Janitor.ResourceGroups.Filter, callbackTtlResourcesMetrics)
+						}
+					}(subscription)
+				}
+				wgMain.Wait()
+				close(callbackTtlResourcesMetrics)
+				close(callbackTtlRoleAssignmentsMetrics)
+			}()
 
 			// channel collecting gofunc
 			wgMetrics.Add(1)
@@ -256,16 +242,13 @@ func (j *Janitor) Run() {
 				}
 			}()
 
-			// wait for subscription main func, then close channel and wait for metrics
-			wgMain.Wait()
-			close(callbackTtlResourcesMetrics)
-			close(callbackTtlRoleAssignmentsMetrics)
+			// wait for metrics processing
 			wgMetrics.Wait()
 
 			duration := time.Since(startTime)
 			j.Prometheus.MetricDuration.With(prometheus.Labels{}).Set(duration.Seconds())
 
-			log.WithField("duration", duration.Seconds()).Infof("finished run in %s, waiting %s", duration.String(), j.Conf.Janitor.Interval.String())
+			runLogger.WithField("duration", duration.Seconds()).Infof("finished run in %s, waiting %s", duration.String(), j.Conf.Janitor.Interval.String())
 			time.Sleep(j.Conf.Janitor.Interval)
 		}
 	}()
@@ -275,20 +258,21 @@ func (j *Janitor) initAuzreApiVersions() {
 	ctx := context.Background()
 
 	j.apiVersionMap = map[string]map[string]string{}
-	for _, subscription := range j.Azure.Subscriptions {
-		subscriptionId := *subscription.SubscriptionID
+	for _, subscription := range j.subscriptionList(ctx) {
+		subscriptionId := to.String(subscription.SubscriptionID)
 
 		contextLogger := log.WithFields(log.Fields{
-			"subscription": subscriptionId,
+			"subscriptionID":   to.String(subscription.SubscriptionID),
+			"subscriptionName": to.String(subscription.DisplayName),
 		})
 
 		// fetch location translation map
-		locationClient := subscriptions.NewClientWithBaseURI(j.Azure.Environment.ResourceManagerEndpoint)
+		locationClient := subscriptions.NewClientWithBaseURI(j.Azure.Client.Environment.ResourceManagerEndpoint)
 		j.decorateAzureAutorest(&locationClient.Client)
 
 		locationResult, err := locationClient.ListLocations(ctx, subscriptionId, nil)
 		if err != nil {
-			contextLogger.Panic(err)
+			contextLogger.Panic(err.Error())
 		}
 
 		locationMap := map[string]string{}
@@ -299,12 +283,12 @@ func (j *Janitor) initAuzreApiVersions() {
 		}
 
 		// fetch providers
-		providersClient := resources.NewProvidersClientWithBaseURI(j.Azure.Environment.ResourceManagerEndpoint, *subscription.SubscriptionID)
+		providersClient := resources.NewProvidersClientWithBaseURI(j.Azure.Client.Environment.ResourceManagerEndpoint, *subscription.SubscriptionID)
 		j.decorateAzureAutorest(&providersClient.Client)
 
 		result, err := providersClient.ListComplete(ctx, nil, "")
 		if err != nil {
-			contextLogger.Panic(err)
+			contextLogger.Panic(err.Error())
 		}
 
 		j.apiVersionMap[subscriptionId] = map[string]string{}
@@ -413,7 +397,7 @@ func (j *Janitor) checkAzureResourceExpiry(logger *log.Entry, resourceType, reso
 			resourceTagRewriteNeeded = true
 			resourceExpireTime = val
 		} else {
-			logger.Errorf("ERROR %s", timeParseErr)
+			logger.Errorf("ERROR %s", timeParseErr.Error())
 		}
 	}
 
@@ -501,10 +485,5 @@ func (j *Janitor) checkExpiryDate(value string) (parsedTime *time.Time, expired 
 }
 
 func (j *Janitor) decorateAzureAutorest(client *autorest.Client) {
-	client.Authorizer = j.Azure.Authorizer
-	if err := client.AddToUserAgent(j.UserAgent); err != nil {
-		log.Panic(err)
-	}
-
-	azuretracing.DecorateAzureAutoRestClient(client)
+	j.Azure.Client.DecorateAzureAutorest(client)
 }

@@ -116,14 +116,14 @@ func TestResourceGroupExpiry(t *testing.T) {
 func assumeError(t *testing.T, message string, err error) {
 	t.Helper()
 	if err == nil {
-		t.Fatalf(`expected %v w/ error, got: "%v"`, message, err)
+		t.Fatalf(`expected %v w/ error, got: "%v"`, message, err.Error())
 	}
 }
 
 func assumeNotError(t *testing.T, message string, err error) {
 	t.Helper()
 	if err != nil {
-		t.Fatalf(`expected %v w/o error, got: "%v"`, message, err)
+		t.Fatalf(`expected %v w/o error, got: "%v"`, message, err.Error())
 	}
 }
 

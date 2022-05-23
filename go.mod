@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/Azure/azure-sdk-for-go v63.1.0+incompatible
 	github.com/Azure/go-autorest/autorest v0.11.24
-	github.com/Azure/go-autorest/autorest/azure/auth v0.5.11
+	github.com/Azure/go-autorest/autorest/azure/auth v0.5.11 // indirect
 	github.com/Azure/go-autorest/autorest/to v0.4.0
 	github.com/Azure/go-autorest/autorest/validation v0.3.1 // indirect
 	github.com/jessevdk/go-flags v1.5.0
@@ -14,10 +14,9 @@ require (
 	github.com/prometheus/common v0.32.1 // indirect
 	github.com/rickb777/date v1.17.0
 	github.com/sirupsen/logrus v1.8.1
+	github.com/webdevops/go-common v0.0.0-20220522185207-16fd48b07ed7
 	golang.org/x/crypto v0.0.0-20220315160706-3147a52a75dd // indirect
 )
-
-require github.com/webdevops/go-common v0.0.0-20220406110653-237539a358b2
 
 require (
 	github.com/Azure/go-autorest v14.2.0+incompatible // indirect
@@ -36,6 +35,7 @@ require (
 	github.com/patrickmn/go-cache v2.1.0+incompatible // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
+	github.com/remeh/sizedwaitgroup v1.0.0 // indirect
 	github.com/rickb777/plural v1.4.1 // indirect
 	github.com/stretchr/testify v1.5.1 // indirect
 	golang.org/x/sys v0.0.0-20220319134239-a9b59b0215f8 // indirect
