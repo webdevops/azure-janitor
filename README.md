@@ -26,8 +26,7 @@ Application Options:
       --log.json                                  Switch log output to json format [$LOG_JSON]
       --azure.environment=                        Azure environment name (default: AZUREPUBLICCLOUD) [$AZURE_ENVIRONMENT]
       --azure.subscription=                       Azure subscription ID (space delimiter) [$AZURE_SUBSCRIPTION_ID]
-      --azure.resource.tags=                      Azure resource labels to add as metric labels (space delimiter)
-                                                  [$AZURE_RESOURCE_TAGS]
+      --azure.resource-tag=                       Azure Resource tags (space delimiter) (default: owner) [$AZURE_RESOURCE_TAG]
       --janitor.interval=                         Janitor interval (time.duration) (default: 1h) [$JANITOR_INTERVAL]
       --janitor.tag=                              Janitor azure tag (string) (default: ttl) [$JANITOR_TAG]
       --janitor.tag.target=                       Janitor azure tag (string) (default: ttl_expiry) [$JANITOR_TAG_TARGET]
@@ -56,7 +55,10 @@ Help Options:
   -h, --help                                      Show this help message
 ```
 
-for Azure API authentication (using ENV vars) see https://docs.microsoft.com/en-us/azure/developer/go/azure-sdk-authentication
+for Azure API authentication (using ENV vars)
+see https://docs.microsoft.com/en-us/azure/developer/go/azure-sdk-authentication
+
+For AzureCLI authentication set `AZURE_AUTH=az`
 
 ## Azure tag
 
