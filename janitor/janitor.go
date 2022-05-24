@@ -397,7 +397,7 @@ func (j *Janitor) checkAzureResourceExpiry(logger *log.Entry, resourceType, reso
 			resourceTagRewriteNeeded = true
 			resourceExpireTime = val
 		} else {
-			logger.Errorf("ERROR %s", timeParseErr.Error())
+			logger.Errorf("unable to parse time: %v", timeParseErr.Error())
 		}
 	}
 

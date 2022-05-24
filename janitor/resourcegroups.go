@@ -54,10 +54,11 @@ func (j *Janitor) runResourceGroups(ctx context.Context, logger *log.Entry, subs
 					resourceLogger.Infof("successfully updated")
 				} else {
 					// failed delete
-					resourceLogger.Errorf("ERROR %s", err.Error())
+					resourceLogger.Error(err.Error())
 
 					j.Prometheus.MetricErrors.With(prometheus.Labels{
-						"resourceType": stringToStringLower(resourceType),
+						"subscriptionID": stringPtrToStringLower(subscription.SubscriptionID),
+						"resourceType":   stringToStringLower(resourceType),
 					}).Inc()
 				}
 			}
