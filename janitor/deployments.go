@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/profiles/2020-09-01/resources/mgmt/resources"
-	"github.com/Azure/azure-sdk-for-go/profiles/latest/resources/mgmt/subscriptions"
+	"github.com/Azure/azure-sdk-for-go/profiles/2020-09-01/resources/mgmt/resources" //nolint:staticcheck
+	"github.com/Azure/azure-sdk-for-go/profiles/latest/resources/mgmt/subscriptions" //nolint:staticcheck
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"

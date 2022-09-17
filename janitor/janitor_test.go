@@ -1,7 +1,7 @@
 package janitor
 
 import (
-	"io/ioutil"
+	"io"
 	"testing"
 	"time"
 
@@ -56,7 +56,7 @@ func TestResourceGroupExpiry(t *testing.T) {
 	var resourceExpireTime *time.Time
 
 	logger := log.New()
-	logger.Out = ioutil.Discard
+	logger.Out = io.Discard
 	contextLogger := logger.WithField("type", "testing")
 
 	j := buildJanitorObj()

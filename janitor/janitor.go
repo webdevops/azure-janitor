@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/profiles/latest/resources/mgmt/resources"
-	"github.com/Azure/azure-sdk-for-go/profiles/latest/resources/mgmt/subscriptions"
+	"github.com/Azure/azure-sdk-for-go/profiles/latest/resources/mgmt/resources"     //nolint:staticcheck
+	"github.com/Azure/azure-sdk-for-go/profiles/latest/resources/mgmt/subscriptions" //nolint:staticcheck
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/to"
 	tparse "github.com/karrick/tparse/v2"
@@ -146,7 +146,7 @@ func (j *Janitor) initPrometheus() {
 	prometheus.MustRegister(j.Prometheus.MetricErrors)
 }
 
-func (j *Janitor) subscriptionList(ctx context.Context) []subscriptions.Subscription {
+func (j *Janitor) subscriptionList(ctx context.Context) map[string]subscriptions.Subscription {
 	subscriptionList, err := j.Azure.Client.ListCachedSubscriptionsWithFilter(ctx, j.Azure.Subscription...)
 	if err != nil {
 		log.Panic(err.Error())
