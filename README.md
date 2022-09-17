@@ -36,20 +36,25 @@ Application Options:
       --janitor.resources                         Enable Azure Resources cleanup [$JANITOR_RESOURCES_ENABLE]
       --janitor.resources.filter=                 Additional $filter for Azure REST API for Resources [$JANITOR_RESOURCES_FILTER]
       --janitor.deployments                       Enable Azure Deployments cleanup [$JANITOR_DEPLOYMENTS_ENABLE]
-      --janitor.deployments.ttl=                  Janitor deployment ttl (time.duration) (default: 8760h) [$JANITOR_DEPLOYMENTS_TTL]
-      --janitor.deployments.limit=                Janitor deployment limit count (int) (default: 700) [$JANITOR_DEPLOYMENTS_LIMIT]
+      --janitor.deployments.ttl=                  Janitor deployment ttl (time.duration) (default: 8760h)
+                                                  [$JANITOR_DEPLOYMENTS_TTL]
+      --janitor.deployments.limit=                Janitor deployment limit count (int) (default: 700)
+                                                  [$JANITOR_DEPLOYMENTS_LIMIT]
       --janitor.roleassignments                   Enable Azure RoleAssignments cleanup [$JANITOR_ROLEASSIGNMENTS_ENABLE]
       --janitor.roleassignments.ttl=              Janitor roleassignment ttl (time.duration) (default: 6h)
                                                   [$JANITOR_ROLEASSIGNMENTS_TTL]
       --janitor.roleassignments.roledefinitionid= Janitor roledefinition ID (eg:
-                                                  /subscriptions/xxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx/providers/Microsoft.Authorization/-
-                                                  roleDefinitions/xxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx)  (space delimiter)
+                                                  /subscriptions/xxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx/providers/Microsoft.Authorizat-
+
+                                                  ion/roleDefinitions/xxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx)  (space delimiter)
                                                   [$JANITOR_ROLEASSIGNMENTS_ROLEDEFINITIONID]
       --janitor.roleassignments.filter=           Additional $filter for Azure REST API for RoleAssignments
                                                   [$JANITOR_ROLEASSIGNMENTS_FILTER]
       --janitor.roleassignments.descriptionttl=   Regexp for detecting ttl inside description of RoleAssignment
                                                   [$JANITOR_ROLEASSIGNMENTS_DESCRIPTIONTTL]
-      --bind=                                     Server address (default: :8080) [$SERVER_BIND]
+      --server.bind=                              Server address (default: :8080) [$SERVER_BIND]
+      --server.timeout.read=                      Server read timeout (default: 5s) [$SERVER_TIMEOUT_READ]
+      --server.timeout.write=                     Server write timeout (default: 10s) [$SERVER_TIMEOUT_WRITE]
 
 Help Options:
   -h, --help                                      Show this help message
