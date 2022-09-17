@@ -1,6 +1,6 @@
 module github.com/webdevops/azure-janitor
 
-go 1.18
+go 1.19
 
 require (
 	github.com/Azure/azure-sdk-for-go v64.1.0+incompatible
