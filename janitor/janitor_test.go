@@ -1,12 +1,11 @@
 package janitor
 
 import (
-	"io"
 	"testing"
 	"time"
 
-	"github.com/Azure/go-autorest/autorest/to"
-	log "github.com/sirupsen/logrus"
+	"github.com/webdevops/go-common/utils/to"
+	"go.uber.org/zap"
 
 	"github.com/webdevops/azure-janitor/config"
 )
@@ -18,6 +17,14 @@ func buildJanitorObj() *Janitor {
 	j := Janitor{Conf: opts}
 
 	return &j
+}
+
+func buildTestLogger() *zap.SugaredLogger {
+	loggerConfig := zap.NewDevelopmentConfig()
+	loggerConfig.OutputPaths = []string{"/dev/null"}
+	loggerConfig.ErrorOutputPaths = []string{"/dev/null"}
+	logger, _ := loggerConfig.Build()
+	return logger.Sugar()
 }
 
 func TestDurationParser(t *testing.T) {
@@ -55,9 +62,7 @@ func TestResourceGroupExpiry(t *testing.T) {
 	var resourceExpired, resourceTagRewriteNeeded bool
 	var resourceExpireTime *time.Time
 
-	logger := log.New()
-	logger.Out = io.Discard
-	contextLogger := logger.WithField("type", "testing")
+	contextLogger := buildTestLogger()
 
 	j := buildJanitorObj()
 

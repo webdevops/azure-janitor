@@ -3,7 +3,7 @@ package janitor
 import (
 	"strings"
 
-	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/webdevops/go-common/utils/to"
 )
 
 func stringPtrToStringLower(val *string) string {

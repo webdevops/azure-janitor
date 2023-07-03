@@ -4,83 +4,97 @@ import (
 	"context"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/profiles/2020-09-01/resources/mgmt/resources" //nolint:staticcheck
-	"github.com/Azure/azure-sdk-for-go/profiles/latest/resources/mgmt/subscriptions" //nolint:staticcheck
-	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions"
 	"github.com/prometheus/client_golang/prometheus"
-	log "github.com/sirupsen/logrus"
 	prometheusCommon "github.com/webdevops/go-common/prometheus"
+	"github.com/webdevops/go-common/utils/to"
+	"go.uber.org/zap"
 )
 
-func (j *Janitor) runDeployments(ctx context.Context, logger *log.Entry, subscription subscriptions.Subscription, ttlMetricsChan chan<- *prometheusCommon.MetricList) {
+func (j *Janitor) runDeployments(ctx context.Context, logger *zap.SugaredLogger, subscription *armsubscriptions.Subscription, ttlMetricsChan chan<- *prometheusCommon.MetricList) {
 	var deploymentCounter, deploymentFinalCounter int64
-	contextLogger := logger.WithField("task", "deployment")
+	contextLogger := logger.With(zap.String("task", "deployment"))
 
-	client := resources.NewGroupsClientWithBaseURI(j.Azure.Client.Environment.ResourceManagerEndpoint, *subscription.SubscriptionID)
-	j.decorateAzureAutorest(&client.Client)
+	client, err := armresources.NewResourceGroupsClient(*subscription.SubscriptionID, j.Azure.Client.GetCred(), j.Azure.Client.NewArmClientOptions())
+	if err != nil {
+		logger.Panic(err)
+	}
 
 	resourceTtl := prometheusCommon.NewMetricsList()
 
-	deploymentClient := resources.NewDeploymentsClientWithBaseURI(j.Azure.Client.Environment.ResourceManagerEndpoint, *subscription.SubscriptionID)
-	j.decorateAzureAutorest(&deploymentClient.Client)
+	deploymentClient, err := armresources.NewDeploymentsClient(*subscription.SubscriptionID, j.Azure.Client.GetCred(), j.Azure.Client.NewArmClientOptions())
+	if err != nil {
+		logger.Panic(err)
+	}
 
 	resourceType := "Microsoft.Resources/deployments"
 
-	resourceGroupResult, err := client.ListComplete(ctx, "", nil)
-	if err != nil {
-		panic(err.Error())
-	}
-
-	for _, resourceGroup := range *resourceGroupResult.Response().Value {
-		deploymentCounter = 0
-		deploymentFinalCounter = 0
-
-		resourceLogger := contextLogger.WithField("resource", to.String(resourceGroup.ID))
-
-		deploymentResult, err := deploymentClient.ListByResourceGroupComplete(ctx, *resourceGroup.Name, "", nil)
+	resourceGroupPager := client.NewListPager(nil)
+	for resourceGroupPager.More() {
+		resourceGroupResult, err := resourceGroupPager.NextPage(ctx)
 		if err != nil {
-			panic(err.Error())
+			logger.Panic(err)
 		}
 
-		for _, deployment := range *deploymentResult.Response().Value {
-			deleteDeployment := false
-			deploymentCounter++
+		for _, resourceGroup := range resourceGroupResult.Value {
+			deploymentCounter = 0
+			deploymentFinalCounter = 0
 
-			if deploymentCounter >= j.Conf.Janitor.Deployments.Limit {
-				// limit reached
-				deleteDeployment = true
-			} else if deployment.Properties != nil && deployment.Properties.Timestamp != nil {
-				// expire check
-				deploymentAge := time.Since(deployment.Properties.Timestamp.Time)
-				if deploymentAge.Seconds() > j.Conf.Janitor.Deployments.Ttl.Seconds() {
-					deleteDeployment = true
+			resourceLogger := contextLogger.With(zap.String("resource", to.String(resourceGroup.ID)))
+
+			deploymentPager := deploymentClient.NewListByResourceGroupPager(*resourceGroup.Name, nil)
+			if err != nil {
+				logger.Panic(err)
+			}
+
+			for deploymentPager.More() {
+				deploymentResult, err := deploymentPager.NextPage(ctx)
+				if err != nil {
+					logger.Panic(err)
+				}
+
+				for _, deployment := range deploymentResult.Value {
+					deleteDeployment := false
+					deploymentCounter++
+
+					if deploymentCounter >= j.Conf.Janitor.Deployments.Limit {
+						// limit reached
+						deleteDeployment = true
+					} else if deployment.Properties != nil && deployment.Properties.Timestamp != nil {
+						// expire check
+						deploymentAge := time.Since(deployment.Properties.Timestamp.UTC())
+						if deploymentAge.Seconds() > j.Conf.Janitor.Deployments.Ttl.Seconds() {
+							deleteDeployment = true
+						}
+					}
+
+					if !j.Conf.DryRun && deleteDeployment {
+						if _, err := deploymentClient.BeginDelete(ctx, to.String(resourceGroup.Name), to.String(deployment.Name), nil); err == nil {
+							// successfully deleted
+							resourceLogger.Infof("%s: successfully deleted", to.String(deployment.ID))
+
+							j.Prometheus.MetricDeletedResource.With(prometheus.Labels{
+								"subscriptionID": stringPtrToStringLower(subscription.SubscriptionID),
+								"resourceType":   stringToStringLower(resourceType),
+							}).Inc()
+						} else {
+							// failed delete
+							resourceLogger.Errorf("%s: ERROR %s", to.String(deployment.ID), err.Error())
+
+							j.Prometheus.MetricErrors.With(prometheus.Labels{
+								"subscriptionID": stringPtrToStringLower(subscription.SubscriptionID),
+								"resourceType":   stringToStringLower(resourceType),
+							}).Inc()
+						}
+					} else {
+						deploymentFinalCounter++
+					}
 				}
 			}
 
-			if !j.Conf.DryRun && deleteDeployment {
-				if _, err := deploymentClient.Delete(ctx, to.String(resourceGroup.Name), to.String(deployment.Name)); err == nil {
-					// successfully deleted
-					resourceLogger.Infof("%s: successfully deleted", to.String(deployment.ID))
-
-					j.Prometheus.MetricDeletedResource.With(prometheus.Labels{
-						"subscriptionID": stringPtrToStringLower(subscription.SubscriptionID),
-						"resourceType":   stringToStringLower(resourceType),
-					}).Inc()
-				} else {
-					// failed delete
-					resourceLogger.Errorf("%s: ERROR %s", to.String(deployment.ID), err.Error())
-
-					j.Prometheus.MetricErrors.With(prometheus.Labels{
-						"subscriptionID": stringPtrToStringLower(subscription.SubscriptionID),
-						"resourceType":   stringToStringLower(resourceType),
-					}).Inc()
-				}
-			} else {
-				deploymentFinalCounter++
-			}
+			resourceLogger.Infof("found %v deployments, %v still existing, %v deleted", deploymentCounter, deploymentFinalCounter, deploymentCounter-deploymentFinalCounter)
 		}
-
-		resourceLogger.Infof("found %v deployments, %v still existing, %v deleted", deploymentCounter, deploymentFinalCounter, deploymentCounter-deploymentFinalCounter)
 	}
 
 	ttlMetricsChan <- resourceTtl

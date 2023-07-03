@@ -5,16 +5,15 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"path"
 	"regexp"
 	"runtime"
 	"strings"
 
 	"github.com/jessevdk/go-flags"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	log "github.com/sirupsen/logrus"
-	azureCommon "github.com/webdevops/go-common/azure"
-	"github.com/webdevops/go-common/prometheus/azuretracing"
+	"github.com/webdevops/go-common/azuresdk/armclient"
+	"github.com/webdevops/go-common/azuresdk/azidentity"
+	"github.com/webdevops/go-common/azuresdk/prometheus/tracing"
 
 	"github.com/webdevops/azure-janitor/config"
 	"github.com/webdevops/azure-janitor/janitor"
@@ -28,9 +27,9 @@ const (
 
 var (
 	argparser *flags.Parser
-	opts      config.Opts
+	Opts      config.Opts
 
-	AzureClient *azureCommon.Client
+	AzureClient *armclient.ArmClient
 
 	// Git version information
 	gitCommit = "<unknown>"
@@ -40,31 +39,32 @@ var (
 func main() {
 	initArgparser()
 
-	log.Infof("starting azure-janitor v%s (%s; %s; by %v)", gitTag, gitCommit, runtime.Version(), Author)
-	log.Info(string(opts.GetJson()))
+	logger.Infof("starting azure-janitor v%s (%s; %s; by %v)", gitTag, gitCommit, runtime.Version(), Author)
+	logger.Info(string(Opts.GetJson()))
 
-	log.Infof("init Azure connection")
+	logger.Infof("init Azure connection")
 	initAzureConnection()
 
-	log.Infof("init Janitor")
+	logger.Infof("init Janitor")
 	j := janitor.Janitor{
-		Conf:      opts,
+		Conf:      Opts,
 		UserAgent: UserAgent + gitTag,
+		Logger:    logger,
 		Azure: janitor.JanitorAzureConfig{
 			Client:       AzureClient,
-			Subscription: opts.Azure.Subscription,
+			Subscription: Opts.Azure.Subscription,
 		},
 	}
 	j.Init()
 	j.Run()
 
-	log.Infof("starting http server on %s", opts.Server.Bind)
+	logger.Infof("starting http server on %s", Opts.Server.Bind)
 	startHttpServer()
 }
 
 // init argparser and parse/validate arguments
 func initArgparser() {
-	argparser = flags.NewParser(&opts, flags.Default)
+	argparser = flags.NewParser(&Opts, flags.Default)
 	_, err := argparser.Parse()
 
 	// check if there is an parse error
@@ -79,76 +79,47 @@ func initArgparser() {
 		}
 	}
 
-	// verbose level
-	if opts.Logger.Verbose {
-		log.SetLevel(log.DebugLevel)
-	}
-
-	// debug level
-	if opts.Logger.Debug {
-		log.SetReportCaller(true)
-		log.SetLevel(log.TraceLevel)
-		log.SetFormatter(&log.TextFormatter{
-			CallerPrettyfier: func(f *runtime.Frame) (string, string) {
-				s := strings.Split(f.Function, ".")
-				funcName := s[len(s)-1]
-				return funcName, fmt.Sprintf("%s:%d", path.Base(f.File), f.Line)
-			},
-		})
-	}
-
-	// json log format
-	if opts.Logger.LogJson {
-		log.SetReportCaller(true)
-		log.SetFormatter(&log.JSONFormatter{
-			DisableTimestamp: true,
-			CallerPrettyfier: func(f *runtime.Frame) (string, string) {
-				s := strings.Split(f.Function, ".")
-				funcName := s[len(s)-1]
-				return funcName, fmt.Sprintf("%s:%d", path.Base(f.File), f.Line)
-			},
-		})
-	}
+	initLogger()
 
 	// resourceGroup filter
-	opts.Janitor.ResourceGroups.Filter = fmt.Sprintf(
+	Opts.Janitor.ResourceGroups.Filter = fmt.Sprintf(
 		"tagName eq '%s'",
-		strings.Replace(opts.Janitor.Tag, "'", "\\'", -1),
+		strings.Replace(Opts.Janitor.Tag, "'", "\\'", -1),
 	)
 
 	// ResourceGroups: add additional filter
-	if opts.Janitor.ResourceGroups.AdditionalFilter != nil {
-		opts.Janitor.ResourceGroups.Filter = fmt.Sprintf(
+	if Opts.Janitor.ResourceGroups.AdditionalFilter != nil {
+		Opts.Janitor.ResourceGroups.Filter = fmt.Sprintf(
 			"%s and %s",
-			opts.Janitor.ResourceGroups.Filter,
-			*opts.Janitor.ResourceGroups.AdditionalFilter,
+			Opts.Janitor.ResourceGroups.Filter,
+			*Opts.Janitor.ResourceGroups.AdditionalFilter,
 		)
 	}
 
 	// Resources: add additional filter
 	// resource (if we specify tagValue here we don't get the tag.. wtf?!)
-	opts.Janitor.Resources.Filter = ""
-	if opts.Janitor.Resources.AdditionalFilter != nil {
-		opts.Janitor.Resources.Filter = *opts.Janitor.Resources.AdditionalFilter
+	Opts.Janitor.Resources.Filter = ""
+	if Opts.Janitor.Resources.AdditionalFilter != nil {
+		Opts.Janitor.Resources.Filter = *Opts.Janitor.Resources.AdditionalFilter
 	}
 
-	if opts.Janitor.RoleAssignments.Enable {
-		if len(opts.Janitor.RoleAssignments.RoleDefintionIds) == 0 {
-			log.Panic("roleAssignment janitor active but no roleDefinitionIds defined")
+	if Opts.Janitor.RoleAssignments.Enable {
+		if len(Opts.Janitor.RoleAssignments.RoleDefintionIds) == 0 {
+			logger.Panic("roleAssignment janitor active but no roleDefinitionIds defined")
 		}
 	}
 
 	// RoleAssignments: add additional filter
-	if opts.Janitor.RoleAssignments.AdditionalFilter != nil {
-		opts.Janitor.RoleAssignments.Filter = *opts.Janitor.RoleAssignments.AdditionalFilter
+	if Opts.Janitor.RoleAssignments.AdditionalFilter != nil {
+		Opts.Janitor.RoleAssignments.Filter = *Opts.Janitor.RoleAssignments.AdditionalFilter
 	}
 
-	if !opts.Janitor.ResourceGroups.Enable && !opts.Janitor.Resources.Enable && !opts.Janitor.Deployments.Enable && !opts.Janitor.RoleAssignments.Enable {
-		log.Fatal("no janitor task (resources, resourcegroups, deployments, roleassignments) enabled, not starting")
+	if !Opts.Janitor.ResourceGroups.Enable && !Opts.Janitor.Resources.Enable && !Opts.Janitor.Deployments.Enable && !Opts.Janitor.RoleAssignments.Enable {
+		logger.Fatal("no janitor task (resources, resourcegroups, deployments, roleassignments) enabled, not starting")
 	}
 
-	if opts.Janitor.RoleAssignments.DescriptionTtl != nil {
-		opts.Janitor.RoleAssignments.DescriptionTtlRegExp = regexp.MustCompile(*opts.Janitor.RoleAssignments.DescriptionTtl)
+	if Opts.Janitor.RoleAssignments.DescriptionTtl != nil {
+		Opts.Janitor.RoleAssignments.DescriptionTtlRegExp = regexp.MustCompile(*Opts.Janitor.RoleAssignments.DescriptionTtl)
 	}
 
 	checkForDeprecations()
@@ -169,18 +140,24 @@ func checkForDeprecations() {
 
 	for envVar, solution := range deprecatedEnvVars {
 		if val := os.Getenv(envVar); val != "" {
-			log.Panicf(`unsupported environment variable "%v" detected: %v`, envVar, solution)
+			logger.Panicf(`unsupported environment variable "%v" detected: %v`, envVar, solution)
 		}
 	}
 }
 
 func initAzureConnection() {
 	var err error
-	AzureClient, err = azureCommon.NewClientFromEnvironment(*opts.Azure.Environment, log.StandardLogger())
-	if err != nil {
-		log.Panic(err.Error())
+
+	if Opts.Azure.Environment != nil {
+		if err := os.Setenv(azidentity.EnvAzureEnvironment, *Opts.Azure.Environment); err != nil {
+			logger.Warnf(`unable to set envvar "%s": %v`, azidentity.EnvAzureEnvironment, err.Error())
+		}
 	}
 
+	AzureClient, err = armclient.NewArmClientFromEnvironment(logger)
+	if err != nil {
+		logger.Fatal(err.Error())
+	}
 	AzureClient.SetUserAgent(UserAgent + gitTag)
 }
 
@@ -191,24 +168,24 @@ func startHttpServer() {
 	// healthz
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		if _, err := fmt.Fprint(w, "Ok"); err != nil {
-			log.Error(err)
+			logger.Error(err)
 		}
 	})
 
 	// readyz
 	mux.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
 		if _, err := fmt.Fprint(w, "Ok"); err != nil {
-			log.Error(err)
+			logger.Error(err)
 		}
 	})
 
-	mux.Handle("/metrics", azuretracing.RegisterAzureMetricAutoClean(promhttp.Handler()))
+	mux.Handle("/metrics", tracing.RegisterAzureMetricAutoClean(promhttp.Handler()))
 
 	srv := &http.Server{
-		Addr:         opts.Server.Bind,
+		Addr:         Opts.Server.Bind,
 		Handler:      mux,
-		ReadTimeout:  opts.Server.ReadTimeout,
-		WriteTimeout: opts.Server.WriteTimeout,
+		ReadTimeout:  Opts.Server.ReadTimeout,
+		WriteTimeout: Opts.Server.WriteTimeout,
 	}
-	log.Fatal(srv.ListenAndServe())
+	logger.Fatal(srv.ListenAndServe())
 }

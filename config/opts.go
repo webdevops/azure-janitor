@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"regexp"
 	"time"
-
-	log "github.com/sirupsen/logrus"
 )
 
 type (
@@ -14,9 +12,9 @@ type (
 
 		// logger
 		Logger struct {
-			Debug   bool `           long:"debug"        env:"DEBUG"    description:"debug mode"`
-			Verbose bool `short:"v"  long:"verbose"      env:"VERBOSE"  description:"verbose mode"`
-			LogJson bool `           long:"log.json"     env:"LOG_JSON" description:"Switch log output to json format"`
+			Debug       bool `long:"log.debug"    env:"LOG_DEBUG"  description:"debug mode"`
+			Development bool `long:"log.devel"    env:"LOG_DEVEL"  description:"development mode"`
+			Json        bool `long:"log.json"     env:"LOG_JSON"   description:"Switch log output to json format"`
 		}
 
 		// azure
@@ -74,7 +72,7 @@ type (
 func (o *Opts) GetJson() []byte {
 	jsonBytes, err := json.Marshal(o)
 	if err != nil {
-		log.Panic(err)
+		panic(err)
 	}
 	return jsonBytes
 }

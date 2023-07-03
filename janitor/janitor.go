@@ -7,16 +7,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/profiles/latest/resources/mgmt/resources"     //nolint:staticcheck
-	"github.com/Azure/azure-sdk-for-go/profiles/latest/resources/mgmt/subscriptions" //nolint:staticcheck
-	"github.com/Azure/go-autorest/autorest"
-	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions"
 	tparse "github.com/karrick/tparse/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rickb777/date/period"
-	log "github.com/sirupsen/logrus"
-	azureCommon "github.com/webdevops/go-common/azure"
+	"github.com/webdevops/go-common/azuresdk/armclient"
 	prometheusCommon "github.com/webdevops/go-common/prometheus"
+	"github.com/webdevops/go-common/utils/to"
+	"go.uber.org/zap"
 
 	"github.com/webdevops/azure-janitor/config"
 )
@@ -32,6 +31,8 @@ type (
 		Conf  config.Opts
 		Azure JanitorAzureConfig
 
+		Logger *zap.SugaredLogger
+
 		UserAgent string
 
 		Prometheus struct {
@@ -44,8 +45,10 @@ type (
 	}
 
 	JanitorAzureConfig struct {
-		Client       *azureCommon.Client
-		Subscription []string
+		Client                *armclient.ArmClient
+		Subscription          []string
+		SubscriptionsIterator *armclient.SubscriptionsIterator
+		ResourceTagManager    *armclient.ResourceTagManager
 	}
 )
 
@@ -73,11 +76,20 @@ var (
 )
 
 func (j *Janitor) Init() {
+	// init subscription iterator
+	j.Azure.SubscriptionsIterator = armclient.NewSubscriptionIterator(j.Azure.Client, j.Conf.Azure.Subscription...)
+
 	j.initPrometheus()
 	j.initAuzreApiVersions()
 }
 
 func (j *Janitor) initPrometheus() {
+	var err error
+	j.Azure.ResourceTagManager, err = j.Azure.Client.TagManager.ParseTagConfig(j.Conf.Azure.ResourceTags)
+	if err != nil {
+		j.Logger.Fatal(`unable to parse resourceTag configuration "%s": %v"`, j.Conf.Azure.ResourceTags, err.Error())
+	}
+
 	j.Prometheus.MetricDuration = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "azurejanitor_duration",
@@ -92,14 +104,13 @@ func (j *Janitor) initPrometheus() {
 			Name: "azurejanitor_resources_ttl",
 			Help: "AzureJanitor resources with expiry time",
 		},
-		azureCommon.AddResourceTagsToPrometheusLabelsDefinition(
+		j.Azure.ResourceTagManager.AddToPrometheusLabels(
 			[]string{
 				"resourceID",
 				"subscriptionID",
 				"resourceGroup",
 				"resourceType",
 			},
-			j.Conf.Azure.ResourceTags,
 		),
 	)
 	prometheus.MustRegister(j.Prometheus.MetricTtlResources)
@@ -146,24 +157,15 @@ func (j *Janitor) initPrometheus() {
 	prometheus.MustRegister(j.Prometheus.MetricErrors)
 }
 
-func (j *Janitor) subscriptionList(ctx context.Context) map[string]subscriptions.Subscription {
-	subscriptionList, err := j.Azure.Client.ListCachedSubscriptionsWithFilter(ctx, j.Azure.Subscription...)
-	if err != nil {
-		log.Panic(err.Error())
-	}
-	return subscriptionList
-}
-
 func (j *Janitor) Run() {
 	ctx := context.Background()
 
 	go func() {
 		for {
-			runLogger := log.WithFields(log.Fields{})
+			runLogger := j.Logger
 
 			startTime := time.Now()
 			runLogger.Infof("start janitor run")
-			var wgMain sync.WaitGroup
 			var wgMetrics sync.WaitGroup
 
 			callbackTtlResourcesMetrics := make(chan *prometheusCommon.MetricList)
@@ -171,34 +173,32 @@ func (j *Janitor) Run() {
 
 			// subscription processing
 			go func() {
-				for _, subscription := range j.subscriptionList(ctx) {
-					wgMain.Add(1)
-					go func(subscription subscriptions.Subscription) {
-						defer wgMain.Done()
+				err := j.Azure.SubscriptionsIterator.ForEach(runLogger, func(subscription *armsubscriptions.Subscription, logger *zap.SugaredLogger) {
+					contextLogger := runLogger.With(
+						zap.String("subscriptionID", to.String(subscription.SubscriptionID)),
+						zap.String("subscriptionName", to.String(subscription.DisplayName)),
+					)
 
-						contextLogger := runLogger.WithFields(log.Fields{
-							"subscriptionID":   to.String(subscription.SubscriptionID),
-							"subscriptionName": to.String(subscription.DisplayName),
-						})
+					if j.Conf.Janitor.Deployments.Enable {
+						j.runDeployments(ctx, contextLogger, subscription, callbackTtlResourcesMetrics)
+					}
 
-						if j.Conf.Janitor.Deployments.Enable {
-							j.runDeployments(ctx, contextLogger, subscription, callbackTtlResourcesMetrics)
-						}
+					if j.Conf.Janitor.Resources.Enable {
+						j.runResources(ctx, contextLogger, subscription, j.Conf.Janitor.Resources.Filter, callbackTtlResourcesMetrics)
+					}
 
-						if j.Conf.Janitor.Resources.Enable {
-							j.runResources(ctx, contextLogger, subscription, j.Conf.Janitor.Resources.Filter, callbackTtlResourcesMetrics)
-						}
+					if j.Conf.Janitor.RoleAssignments.Enable {
+						j.runRoleAssignments(ctx, contextLogger, subscription, j.Conf.Janitor.RoleAssignments.Filter, callbackTtlRoleAssignmentsMetrics)
+					}
 
-						if j.Conf.Janitor.RoleAssignments.Enable {
-							j.runRoleAssignments(ctx, contextLogger, subscription, j.Conf.Janitor.RoleAssignments.Filter, callbackTtlRoleAssignmentsMetrics)
-						}
-
-						if j.Conf.Janitor.ResourceGroups.Enable {
-							j.runResourceGroups(ctx, contextLogger, subscription, j.Conf.Janitor.ResourceGroups.Filter, callbackTtlResourcesMetrics)
-						}
-					}(subscription)
+					if j.Conf.Janitor.ResourceGroups.Enable {
+						j.runResourceGroups(ctx, contextLogger, subscription, j.Conf.Janitor.ResourceGroups.Filter, callbackTtlResourcesMetrics)
+					}
+				})
+				if err != nil {
+					runLogger.Panic(err)
 				}
-				wgMain.Wait()
+
 				close(callbackTtlResourcesMetrics)
 				close(callbackTtlRoleAssignmentsMetrics)
 			}()
@@ -248,7 +248,7 @@ func (j *Janitor) Run() {
 			duration := time.Since(startTime)
 			j.Prometheus.MetricDuration.With(prometheus.Labels{}).Set(duration.Seconds())
 
-			runLogger.WithField("duration", duration.Seconds()).Infof("finished run in %s, waiting %s", duration.String(), j.Conf.Janitor.Interval.String())
+			runLogger.With(zap.Float64("duration", duration.Seconds())).Infof("finished run in %s, waiting %s", duration.String(), j.Conf.Janitor.Interval.String())
 			time.Sleep(j.Conf.Janitor.Interval)
 		}
 	}()
@@ -258,96 +258,114 @@ func (j *Janitor) initAuzreApiVersions() {
 	ctx := context.Background()
 
 	j.apiVersionMap = map[string]map[string]string{}
-	for _, subscription := range j.subscriptionList(ctx) {
+
+	err := j.Azure.SubscriptionsIterator.ForEach(j.Logger, func(subscription *armsubscriptions.Subscription, logger *zap.SugaredLogger) {
 		subscriptionId := to.String(subscription.SubscriptionID)
 
-		contextLogger := log.WithFields(log.Fields{
-			"subscriptionID":   to.String(subscription.SubscriptionID),
-			"subscriptionName": to.String(subscription.DisplayName),
-		})
-
 		// fetch location translation map
-		locationClient := subscriptions.NewClientWithBaseURI(j.Azure.Client.Environment.ResourceManagerEndpoint)
-		j.decorateAzureAutorest(&locationClient.Client)
-
-		locationResult, err := locationClient.ListLocations(ctx, subscriptionId, nil)
+		subscriptionClient, err := armsubscriptions.NewClient(j.Azure.Client.GetCred(), j.Azure.Client.NewArmClientOptions())
 		if err != nil {
-			contextLogger.Panic(err.Error())
+			logger.Panic(err)
 		}
 
+		locationPager := subscriptionClient.NewListLocationsPager(*subscription.SubscriptionID, nil)
 		locationMap := map[string]string{}
-		for _, location := range *locationResult.Value {
-			locationDisplayName := to.String(location.DisplayName)
-			locationName := to.String(location.Name)
-			locationMap[locationDisplayName] = locationName
-		}
-
-		// fetch providers
-		providersClient := resources.NewProvidersClientWithBaseURI(j.Azure.Client.Environment.ResourceManagerEndpoint, *subscription.SubscriptionID)
-		j.decorateAzureAutorest(&providersClient.Client)
-
-		result, err := providersClient.ListComplete(ctx, nil, "")
-		if err != nil {
-			contextLogger.Panic(err.Error())
-		}
-
-		j.apiVersionMap[subscriptionId] = map[string]string{}
-		for _, provider := range *result.Response().Value {
-			if provider.ResourceTypes == nil {
-				continue
+		for locationPager.More() {
+			result, err := locationPager.NextPage(ctx)
+			if err != nil {
+				logger.Panic(err)
 			}
 
-			for _, resourceType := range *provider.ResourceTypes {
-				if resourceType.APIVersions == nil {
+			for _, location := range result.Value {
+				locationDisplayName := to.String(location.DisplayName)
+				locationName := to.String(location.Name)
+				locationMap[locationDisplayName] = locationName
+			}
+		}
+
+		providersClient, err := armresources.NewProvidersClient(*subscription.SubscriptionID, j.Azure.Client.GetCred(), j.Azure.Client.NewArmClientOptions())
+		if err != nil {
+			logger.Panic(err)
+		}
+
+		providerPager := providersClient.NewListPager(nil)
+		j.apiVersionMap[subscriptionId] = map[string]string{}
+		for providerPager.More() {
+			result, err := providerPager.NextPage(ctx)
+			if err != nil {
+				logger.Panic(err)
+			}
+
+			for _, provider := range result.Value {
+				if provider.ResourceTypes == nil {
 					continue
 				}
 
-				resourceTypeName := fmt.Sprintf(
-					"%s/%s",
-					strings.ToLower(*provider.Namespace),
-					strings.ToLower(*resourceType.ResourceType),
-				)
-
-				// select best last apiversion
-				lastApiVersion := ""
-				lastApiPreviewVersion := ""
-				providerApiVersion := ""
-				for _, apiVersion := range *resourceType.APIVersions {
-					if strings.Contains(apiVersion, "-preview") {
-						if lastApiVersion == "" || lastApiPreviewVersion > apiVersion {
-							lastApiPreviewVersion = apiVersion
-						}
-					} else {
-						if lastApiVersion == "" || lastApiVersion > apiVersion {
-							lastApiVersion = apiVersion
-						}
-					}
-				}
-
-				// choose best apiversion
-				if lastApiVersion != "" {
-					providerApiVersion = lastApiVersion
-				} else if lastApiPreviewVersion != "" {
-					providerApiVersion = lastApiPreviewVersion
-				}
-
-				// add all locations (if available)
-				for _, location := range *resourceType.Locations {
-					// try to translate location to internal type
-					if val, ok := locationMap[location]; ok {
-						location = val
+				for _, resourceType := range provider.ResourceTypes {
+					if resourceType.APIVersions == nil {
+						continue
 					}
 
-					key := strings.ToLower(fmt.Sprintf("%s::%s", location, resourceTypeName))
+					resourceTypeName := fmt.Sprintf(
+						"%s/%s",
+						strings.ToLower(*provider.Namespace),
+						strings.ToLower(*resourceType.ResourceType),
+					)
+
+					// select best last apiversion
+					lastApiVersion := ""
+					lastApiPreviewVersion := ""
+					providerApiVersion := ""
+					for _, val := range resourceType.APIVersions {
+						if val == nil {
+							continue
+						}
+
+						apiVersion := to.String(val)
+						if strings.Contains(apiVersion, "-preview") {
+							if lastApiVersion == "" || lastApiPreviewVersion > apiVersion {
+								lastApiPreviewVersion = apiVersion
+							}
+						} else {
+							if lastApiVersion == "" || lastApiVersion > apiVersion {
+								lastApiVersion = apiVersion
+							}
+						}
+					}
+
+					// choose best apiversion
+					if lastApiVersion != "" {
+						providerApiVersion = lastApiVersion
+					} else if lastApiPreviewVersion != "" {
+						providerApiVersion = lastApiPreviewVersion
+					}
+
+					// add all locations (if available)
+					for _, val := range resourceType.Locations {
+						if val == nil {
+							continue
+						}
+						location := to.String(val)
+
+						// try to translate location to internal type
+						if val, ok := locationMap[location]; ok {
+							location = val
+						}
+
+						key := strings.ToLower(fmt.Sprintf("%s::%s", location, resourceTypeName))
+						j.apiVersionMap[subscriptionId][key] = providerApiVersion
+					}
+
+					// add no location fallback
+					key := strings.ToLower(fmt.Sprintf("%s::%s", ApiVersionNoLocation, resourceTypeName))
 					j.apiVersionMap[subscriptionId][key] = providerApiVersion
+
 				}
-
-				// add no location fallback
-				key := strings.ToLower(fmt.Sprintf("%s::%s", ApiVersionNoLocation, resourceTypeName))
-				j.apiVersionMap[subscriptionId][key] = providerApiVersion
-
 			}
 		}
+	})
+	if err != nil {
+		j.Logger.Panic(err)
 	}
 }
 
@@ -364,13 +382,11 @@ func (j *Janitor) getAzureApiVersionForResourceType(subscriptionId, location, re
 	return
 }
 
-func (j *Janitor) checkAzureResourceExpiry(logger *log.Entry, resourceType, resourceId string, resourceTags *map[string]*string) (resourceExpireTime *time.Time, resourceExpired bool, resourceTagRewriteNeeded bool) {
+func (j *Janitor) checkAzureResourceExpiry(logger *zap.SugaredLogger, resourceType, resourceId string, resourceTags *map[string]*string) (resourceExpireTime *time.Time, resourceExpired bool, resourceTagRewriteNeeded bool) {
 	ttlValue := j.getTtlTagFromAzureResource(*resourceTags)
 
 	if ttlValue != nil {
-		if j.Conf.Logger.Verbose {
-			logger.Infof("checking ttl")
-		}
+		logger.Debug("checking ttl")
 
 		tagValueParsed, tagValueExpired, timeParseErr := j.checkExpiryDate(*ttlValue)
 		if timeParseErr == nil {
@@ -382,9 +398,7 @@ func (j *Janitor) checkAzureResourceExpiry(logger *log.Entry, resourceType, reso
 					resourceExpired = true
 				}
 			} else {
-				if j.Conf.Logger.Verbose {
-					logger.Infof("NOT expired")
-				}
+				logger.Debug("NOT expired")
 			}
 
 			resourceExpireTime = tagValueParsed
@@ -482,8 +496,4 @@ func (j *Janitor) checkExpiryDate(value string) (parsedTime *time.Time, expired 
 	}
 
 	return
-}
-
-func (j *Janitor) decorateAzureAutorest(client *autorest.Client) {
-	j.Azure.Client.DecorateAzureAutorest(client)
 }
