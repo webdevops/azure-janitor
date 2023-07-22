@@ -12,7 +12,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func (j *Janitor) runDeployments(ctx context.Context, logger *zap.SugaredLogger, subscription *armsubscriptions.Subscription, ttlMetricsChan chan<- *prometheusCommon.MetricList) {
+func (j *Janitor) runDeployments(ctx context.Context, logger *zap.SugaredLogger, subscription *armsubscriptions.Subscription, callback chan<- func()) {
 	var deploymentCounter, deploymentFinalCounter int64
 	contextLogger := logger.With(zap.String("task", "deployment"))
 
@@ -21,7 +21,7 @@ func (j *Janitor) runDeployments(ctx context.Context, logger *zap.SugaredLogger,
 		logger.Panic(err)
 	}
 
-	resourceTtl := prometheusCommon.NewMetricsList()
+	deploymentMetric := prometheusCommon.NewMetricsList()
 
 	deploymentClient, err := armresources.NewDeploymentsClient(*subscription.SubscriptionID, j.Azure.Client.GetCred(), j.Azure.Client.NewArmClientOptions())
 	if err != nil {
@@ -83,6 +83,11 @@ func (j *Janitor) runDeployments(ctx context.Context, logger *zap.SugaredLogger,
 			}
 		}
 	}
+
+	deploymentMetric.Add(prometheus.Labels{
+		"subscriptionID": to.String(subscription.SubscriptionID),
+		"resourceGroup":  "",
+	}, float64(deploymentFinalCounter))
 
 	contextLogger.Infof("found %v deployments on Subscription scope, %v still existing, %v deleted", deploymentCounter, deploymentFinalCounter, deploymentCounter-deploymentFinalCounter)
 
@@ -151,9 +156,16 @@ func (j *Janitor) runDeployments(ctx context.Context, logger *zap.SugaredLogger,
 				}
 			}
 
+			deploymentMetric.Add(prometheus.Labels{
+				"subscriptionID": to.String(subscription.SubscriptionID),
+				"resourceGroup":  to.String(resourceGroup.Name),
+			}, float64(deploymentFinalCounter))
+
 			resourceLogger.Infof("found %v deployments on ResourceGroup scope, %v still existing, %v deleted", deploymentCounter, deploymentFinalCounter, deploymentCounter-deploymentFinalCounter)
 		}
 	}
 
-	ttlMetricsChan <- resourceTtl
+	callback <- func() {
+		deploymentMetric.GaugeSet(j.Prometheus.MetricDeployment)
+	}
 }

@@ -12,7 +12,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func (j *Janitor) runResources(ctx context.Context, logger *zap.SugaredLogger, subscription *armsubscriptions.Subscription, filter string, ttlMetricsChan chan<- *prometheusCommon.MetricList) {
+func (j *Janitor) runResources(ctx context.Context, logger *zap.SugaredLogger, subscription *armsubscriptions.Subscription, filter string, callback chan<- func()) {
 	contextLogger := logger.With(zap.String("task", "resource"))
 
 	client, err := armresources.NewClient(*subscription.SubscriptionID, j.Azure.Client.GetCred(), j.Azure.Client.NewArmClientOptions())
@@ -111,5 +111,7 @@ func (j *Janitor) runResources(ctx context.Context, logger *zap.SugaredLogger, s
 		}
 	}
 
-	ttlMetricsChan <- resourceTtl
+	callback <- func() {
+		resourceTtl.GaugeSet(j.Prometheus.MetricTtlResources)
+	}
 }

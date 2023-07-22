@@ -13,7 +13,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func (j *Janitor) runRoleAssignments(ctx context.Context, logger *zap.SugaredLogger, subscription *armsubscriptions.Subscription, filter string, ttlMetricsChan chan<- *prometheusCommon.MetricList) {
+func (j *Janitor) runRoleAssignments(ctx context.Context, logger *zap.SugaredLogger, subscription *armsubscriptions.Subscription, filter string, callback chan<- func()) {
 	contextLogger := logger.With(zap.String("task", "roleAssignment"))
 
 	resourceTtl := prometheusCommon.NewMetricsList()
@@ -116,5 +116,7 @@ func (j *Janitor) runRoleAssignments(ctx context.Context, logger *zap.SugaredLog
 		}
 	}
 
-	ttlMetricsChan <- resourceTtl
+	callback <- func() {
+		resourceTtl.GaugeSet(j.Prometheus.MetricTtlRoleAssignments)
+	}
 }

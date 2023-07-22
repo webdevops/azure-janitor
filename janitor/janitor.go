@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources"
@@ -13,7 +12,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rickb777/date/period"
 	"github.com/webdevops/go-common/azuresdk/armclient"
-	prometheusCommon "github.com/webdevops/go-common/prometheus"
 	"github.com/webdevops/go-common/utils/to"
 	"go.uber.org/zap"
 
@@ -37,6 +35,7 @@ type (
 
 		Prometheus struct {
 			MetricDuration           *prometheus.GaugeVec
+			MetricDeployment         *prometheus.GaugeVec
 			MetricTtlResources       *prometheus.GaugeVec
 			MetricTtlRoleAssignments *prometheus.GaugeVec
 			MetricDeletedResource    *prometheus.CounterVec
@@ -83,80 +82,6 @@ func (j *Janitor) Init() {
 	j.initAuzreApiVersions()
 }
 
-func (j *Janitor) initPrometheus() {
-	var err error
-	j.Azure.ResourceTagManager, err = j.Azure.Client.TagManager.ParseTagConfig(j.Conf.Azure.ResourceTags)
-	if err != nil {
-		j.Logger.Fatal(`unable to parse resourceTag configuration "%s": %v"`, j.Conf.Azure.ResourceTags, err.Error())
-	}
-
-	j.Prometheus.MetricDuration = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "azurejanitor_duration",
-			Help: "AzureJanitor cleanup duration",
-		},
-		[]string{},
-	)
-	prometheus.MustRegister(j.Prometheus.MetricDuration)
-
-	j.Prometheus.MetricTtlResources = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "azurejanitor_resource_ttl",
-			Help: "AzureJanitor resources with expiry time",
-		},
-		j.Azure.ResourceTagManager.AddToPrometheusLabels(
-			[]string{
-				"resourceID",
-				"subscriptionID",
-				"resourceGroup",
-				"resourceType",
-			},
-		),
-	)
-	prometheus.MustRegister(j.Prometheus.MetricTtlResources)
-
-	j.Prometheus.MetricTtlRoleAssignments = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "azurejanitor_roleassignment_ttl",
-			Help: "AzureJanitor roleassignments with expiry time",
-		},
-		[]string{
-			"roleAssignmentId",
-			"scope",
-			"principalId",
-			"principalType",
-			"roleDefinitionId",
-			"subscriptionID",
-			"resourceGroup",
-		},
-	)
-	prometheus.MustRegister(j.Prometheus.MetricTtlRoleAssignments)
-
-	j.Prometheus.MetricDeletedResource = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "azurejanitor_resource_deleted_count",
-			Help: "AzureJanitor deleted resources",
-		},
-		[]string{
-			"subscriptionID",
-			"resourceType",
-		},
-	)
-	prometheus.MustRegister(j.Prometheus.MetricDeletedResource)
-
-	j.Prometheus.MetricErrors = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "azurejanitor_error_count",
-			Help: "AzureJanitor error counter",
-		},
-		[]string{
-			"subscriptionID",
-			"resourceType",
-		},
-	)
-	prometheus.MustRegister(j.Prometheus.MetricErrors)
-}
-
 func (j *Janitor) Run() {
 	ctx := context.Background()
 
@@ -166,10 +91,8 @@ func (j *Janitor) Run() {
 
 			startTime := time.Now()
 			runLogger.Infof("start janitor run")
-			var wgMetrics sync.WaitGroup
 
-			callbackTtlResourcesMetrics := make(chan *prometheusCommon.MetricList)
-			callbackTtlRoleAssignmentsMetrics := make(chan *prometheusCommon.MetricList)
+			callbackFuncs := make(chan func())
 
 			// subscription processing
 			go func() {
@@ -180,70 +103,44 @@ func (j *Janitor) Run() {
 					)
 
 					if j.Conf.Janitor.Deployments.Enable {
-						j.runDeployments(ctx, contextLogger, subscription, callbackTtlResourcesMetrics)
+						j.runDeployments(ctx, contextLogger, subscription, callbackFuncs)
 					}
 
 					if j.Conf.Janitor.Resources.Enable {
-						j.runResources(ctx, contextLogger, subscription, j.Conf.Janitor.Resources.Filter, callbackTtlResourcesMetrics)
+						j.runResources(ctx, contextLogger, subscription, j.Conf.Janitor.Resources.Filter, callbackFuncs)
 					}
 
 					if j.Conf.Janitor.RoleAssignments.Enable {
-						j.runRoleAssignments(ctx, contextLogger, subscription, j.Conf.Janitor.RoleAssignments.Filter, callbackTtlRoleAssignmentsMetrics)
+						j.runRoleAssignments(ctx, contextLogger, subscription, j.Conf.Janitor.RoleAssignments.Filter, callbackFuncs)
 					}
 
 					if j.Conf.Janitor.ResourceGroups.Enable {
-						j.runResourceGroups(ctx, contextLogger, subscription, j.Conf.Janitor.ResourceGroups.Filter, callbackTtlResourcesMetrics)
+						j.runResourceGroups(ctx, contextLogger, subscription, j.Conf.Janitor.ResourceGroups.Filter, callbackFuncs)
 					}
 				})
 				if err != nil {
 					runLogger.Panic(err)
 				}
 
-				close(callbackTtlResourcesMetrics)
-				close(callbackTtlRoleAssignmentsMetrics)
+				close(callbackFuncs)
 			}()
 
-			// channel collecting gofunc
-			wgMetrics.Add(1)
-			go func() {
-				defer wgMetrics.Done()
-
-				// store metriclists from channel
-				ttlMetricListList := []prometheusCommon.MetricList{}
-				for ttlMetrics := range callbackTtlRoleAssignmentsMetrics {
-					if ttlMetrics != nil {
-						ttlMetricListList = append(ttlMetricListList, *ttlMetrics)
-					}
+			// store metriclists from channel
+			callbackFuncList := []func(){}
+			for callbackFunc := range callbackFuncs {
+				if callbackFunc != nil {
+					callbackFuncList = append(callbackFuncList, callbackFunc)
 				}
+			}
 
-				// after channel is closed: reset metric and set them to the new state
-				j.Prometheus.MetricTtlRoleAssignments.Reset()
-				for _, ttlMetrics := range ttlMetricListList {
-					ttlMetrics.GaugeSet(j.Prometheus.MetricTtlRoleAssignments)
-				}
-			}()
+			// after channel is closed: reset metric and set them to the new state
+			j.Prometheus.MetricDeployment.Reset()
+			j.Prometheus.MetricTtlResources.Reset()
+			j.Prometheus.MetricTtlRoleAssignments.Reset()
 
-			wgMetrics.Add(1)
-			go func() {
-				defer wgMetrics.Done()
-
-				// store metriclists from channel
-				ttlMetricListList := []prometheusCommon.MetricList{}
-				for ttlMetrics := range callbackTtlResourcesMetrics {
-					if ttlMetrics != nil {
-						ttlMetricListList = append(ttlMetricListList, *ttlMetrics)
-					}
-				}
-
-				// after channel is closed: reset metric and set them to the new state
-				j.Prometheus.MetricTtlResources.Reset()
-				for _, ttlMetrics := range ttlMetricListList {
-					ttlMetrics.GaugeSet(j.Prometheus.MetricTtlResources)
-				}
-			}()
-
-			// wait for metrics processing
-			wgMetrics.Wait()
+			for _, callbackFunc := range callbackFuncList {
+				callbackFunc()
+			}
 
 			duration := time.Since(startTime)
 			j.Prometheus.MetricDuration.With(prometheus.Labels{}).Set(duration.Seconds())
