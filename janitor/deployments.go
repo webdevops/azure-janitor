@@ -30,6 +30,64 @@ func (j *Janitor) runDeployments(ctx context.Context, logger *zap.SugaredLogger,
 
 	resourceType := "Microsoft.Resources/deployments"
 
+	// -------------------------------------
+	// Subscription deployments
+	deploymentPager := deploymentClient.NewListAtSubscriptionScopePager(nil)
+	if err != nil {
+		logger.Panic(err)
+	}
+
+	deploymentCounter = 0
+	deploymentFinalCounter = 0
+	for deploymentPager.More() {
+		deploymentResult, err := deploymentPager.NextPage(ctx)
+		if err != nil {
+			logger.Panic(err)
+		}
+
+		for _, deployment := range deploymentResult.Value {
+			deleteDeployment := false
+			deploymentCounter++
+
+			if deploymentCounter >= j.Conf.Janitor.Deployments.Limit {
+				// limit reached
+				deleteDeployment = true
+			} else if deployment.Properties != nil && deployment.Properties.Timestamp != nil {
+				// expire check
+				deploymentAge := time.Since(deployment.Properties.Timestamp.UTC())
+				if deploymentAge.Seconds() > j.Conf.Janitor.Deployments.Ttl.Seconds() {
+					deleteDeployment = true
+				}
+			}
+
+			if !j.Conf.DryRun && deleteDeployment {
+				if _, err := deploymentClient.BeginDeleteAtSubscriptionScope(ctx, to.String(deployment.Name), nil); err == nil {
+					// successfully deleted
+					contextLogger.Infof("%s: successfully deleted", to.String(deployment.ID))
+
+					j.Prometheus.MetricDeletedResource.With(prometheus.Labels{
+						"subscriptionID": stringPtrToStringLower(subscription.SubscriptionID),
+						"resourceType":   stringToStringLower(resourceType),
+					}).Inc()
+				} else {
+					// failed delete
+					contextLogger.Errorf("%s: ERROR %s", to.String(deployment.ID), err.Error())
+
+					j.Prometheus.MetricErrors.With(prometheus.Labels{
+						"subscriptionID": stringPtrToStringLower(subscription.SubscriptionID),
+						"resourceType":   stringToStringLower(resourceType),
+					}).Inc()
+				}
+			} else {
+				deploymentFinalCounter++
+			}
+		}
+	}
+
+	contextLogger.Infof("found %v deployments on Subscription scope, %v still existing, %v deleted", deploymentCounter, deploymentFinalCounter, deploymentCounter-deploymentFinalCounter)
+
+	// -------------------------------------
+	// ResourceGroup deployments
 	resourceGroupPager := client.NewListPager(nil)
 	for resourceGroupPager.More() {
 		resourceGroupResult, err := resourceGroupPager.NextPage(ctx)
@@ -93,7 +151,7 @@ func (j *Janitor) runDeployments(ctx context.Context, logger *zap.SugaredLogger,
 				}
 			}
 
-			resourceLogger.Infof("found %v deployments, %v still existing, %v deleted", deploymentCounter, deploymentFinalCounter, deploymentCounter-deploymentFinalCounter)
+			resourceLogger.Infof("found %v deployments on ResourceGroup scope, %v still existing, %v deleted", deploymentCounter, deploymentFinalCounter, deploymentCounter-deploymentFinalCounter)
 		}
 	}
 
