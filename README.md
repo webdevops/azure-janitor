@@ -236,13 +236,13 @@ Using absolute calculated time:
 
 ## Metrics
 
-| Metric                                         | Type         | Description                                                                           |
-|------------------------------------------------|--------------|---------------------------------------------------------------------------------------|
-| `azurejanitor_duration`                        | Gauge        | Duration of cleanup run in seconds                                                    |
-| `azurejanitor_resources_ttl`                   | Gauge        | List of Azure Resources and ResourceGroups with labels and expiry timestamp as value  |
-| `azurejanitor_roleassignment_ttl`              | Gauge        | List of Azure RoleAssignments with expiry timestamp as value                          |
-| `azurejanitor_resources_deleted`               | Counter      | Number of deleted resources (by resource type)                                        |
-| `azurejanitor_errors`                          | Counter      | Number of failed deleted resources (by resource type)                                 |
+| Metric                                 | Type         | Description                                                                           |
+|----------------------------------------|--------------|---------------------------------------------------------------------------------------|
+| `azurejanitor_duration`                | Gauge        | Duration of cleanup run in seconds                                                    |
+| `azurejanitor_resource_ttl`            | Gauge        | List of Azure Resources and ResourceGroups with labels and expiry timestamp as value  |
+| `azurejanitor_roleassignment_ttl`      | Gauge        | List of Azure RoleAssignments with expiry timestamp as value                          |
+| `azurejanitor_resources_deleted_count` | Counter      | Number of deleted resources (by resource type)                                        |
+| `azurejanitor_error_count`             | Counter      | Number of failed deleted resources (by resource type)                                 |
 
 ### ResourceTags handling
 

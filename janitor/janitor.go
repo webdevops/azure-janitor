@@ -101,7 +101,7 @@ func (j *Janitor) initPrometheus() {
 
 	j.Prometheus.MetricTtlResources = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "azurejanitor_resources_ttl",
+			Name: "azurejanitor_resource_ttl",
 			Help: "AzureJanitor resources with expiry time",
 		},
 		j.Azure.ResourceTagManager.AddToPrometheusLabels(
@@ -134,7 +134,7 @@ func (j *Janitor) initPrometheus() {
 
 	j.Prometheus.MetricDeletedResource = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "azurejanitor_resources_deleted",
+			Name: "azurejanitor_resource_deleted_count",
 			Help: "AzureJanitor deleted resources",
 		},
 		[]string{
@@ -146,7 +146,7 @@ func (j *Janitor) initPrometheus() {
 
 	j.Prometheus.MetricErrors = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "azurejanitor_errors",
+			Name: "azurejanitor_error_count",
 			Help: "AzureJanitor error counter",
 		},
 		[]string{
