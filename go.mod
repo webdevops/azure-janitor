@@ -13,7 +13,7 @@ require (
 	github.com/rickb777/date v1.20.2
 	github.com/webdevops/go-common v0.0.0-20230721104741-533e1c767912
 	go.uber.org/zap v1.24.0
-	golang.org/x/crypto v0.11.0 // indirect
+	golang.org/x/crypto v0.14.0 // indirect
 )
 
 require (
@@ -37,8 +37,8 @@ require (
 	github.com/rickb777/plural v1.4.1 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/net v0.12.0 // indirect
-	golang.org/x/sys v0.10.0 // indirect
-	golang.org/x/text v0.11.0 // indirect
+	golang.org/x/net v0.17.0 // indirect
+	golang.org/x/sys v0.13.0 // indirect
+	golang.org/x/text v0.13.0 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
 )
