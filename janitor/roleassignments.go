@@ -2,6 +2,7 @@ package janitor
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	armauthorization "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2"
@@ -39,18 +40,18 @@ func (j *Janitor) runRoleAssignments(ctx context.Context, logger *zap.SugaredLog
 			azureResource, _ := armclient.ParseResourceId(*roleAssignment.Properties.Scope)
 
 			roleAssignmentLogger := contextLogger.With(
-				zap.String("roleAssignmentId", stringPtrToStringLower(roleAssignment.ID)),
-				zap.String("scope", stringPtrToStringLower(roleAssignment.Properties.Scope)),
-				zap.String("principalId", stringPtrToStringLower(roleAssignment.Properties.PrincipalID)),
-				zap.String("principalType", stringToStringLower(string(*roleAssignment.Properties.PrincipalType))),
-				zap.String("roleDefinitionId", stringPtrToStringLower(roleAssignment.Properties.RoleDefinitionID)),
-				zap.String("subscriptionID", stringPtrToStringLower(subscription.SubscriptionID)),
+				zap.String("roleAssignmentId", to.StringLower(roleAssignment.ID)),
+				zap.String("scope", to.StringLower(roleAssignment.Properties.Scope)),
+				zap.String("principalId", to.StringLower(roleAssignment.Properties.PrincipalID)),
+				zap.String("principalType", strings.ToLower(string(*roleAssignment.Properties.PrincipalType))),
+				zap.String("roleDefinitionId", to.StringLower(roleAssignment.Properties.RoleDefinitionID)),
+				zap.String("subscriptionID", to.StringLower(subscription.SubscriptionID)),
 				zap.String("resourceGroup", azureResource.ResourceGroup),
 			)
 
-			// check if RoleDefinitionID is set
+			// check if roleAssignment is allowed for cleanup
 			// do not want to touch other RoleAssignments
-			if stringInSlice(*roleAssignment.Properties.RoleDefinitionID, j.Conf.Janitor.RoleAssignments.RoleDefintionIds) {
+			if j.isRoleAssignmentCleanupAllowed(roleAssignment) {
 				var roleAssignmentTtl *time.Duration
 				roleAssignmentLogger.Debug("checking ttl")
 
@@ -77,12 +78,12 @@ func (j *Janitor) runRoleAssignments(ctx context.Context, logger *zap.SugaredLog
 				roleAssignmentLogger.Debugf("detected ttl %v", roleAssignmentTtl.String())
 
 				resourceTtl.AddTime(prometheus.Labels{
-					"roleAssignmentId": stringPtrToStringLower(roleAssignment.ID),
-					"scope":            stringPtrToStringLower(roleAssignment.Properties.Scope),
-					"principalId":      stringPtrToStringLower(roleAssignment.Properties.PrincipalID),
-					"principalType":    stringPtrToStringLower(roleAssignment.Type),
-					"roleDefinitionId": stringPtrToStringLower(roleAssignment.Properties.RoleDefinitionID),
-					"subscriptionID":   stringPtrToStringLower(subscription.SubscriptionID),
+					"roleAssignmentId": to.StringLower(roleAssignment.ID),
+					"scope":            to.StringLower(roleAssignment.Properties.Scope),
+					"principalId":      to.StringLower(roleAssignment.Properties.PrincipalID),
+					"principalType":    to.StringLower(roleAssignment.Type),
+					"roleDefinitionId": to.StringLower(roleAssignment.Properties.RoleDefinitionID),
+					"subscriptionID":   to.StringLower(subscription.SubscriptionID),
 					"resourceGroup":    azureResource.ResourceGroup,
 				}, roleAssignmentExpiry)
 
@@ -94,16 +95,16 @@ func (j *Janitor) runRoleAssignments(ctx context.Context, logger *zap.SugaredLog
 							roleAssignmentLogger.Infof("successfully deleted")
 
 							j.Prometheus.MetricDeletedResource.With(prometheus.Labels{
-								"subscriptionID": stringPtrToStringLower(subscription.SubscriptionID),
-								"resourceType":   stringToStringLower(resourceType),
+								"subscriptionID": to.StringLower(subscription.SubscriptionID),
+								"resourceType":   strings.ToLower(resourceType),
 							}).Inc()
 						} else {
 							// failed delete
 							roleAssignmentLogger.Error(err.Error())
 
 							j.Prometheus.MetricErrors.With(prometheus.Labels{
-								"subscriptionID": stringPtrToStringLower(subscription.SubscriptionID),
-								"resourceType":   stringToStringLower(resourceType),
+								"subscriptionID": to.StringLower(subscription.SubscriptionID),
+								"resourceType":   strings.ToLower(resourceType),
 							}).Inc()
 						}
 					} else {
@@ -119,4 +120,20 @@ func (j *Janitor) runRoleAssignments(ctx context.Context, logger *zap.SugaredLog
 	callback <- func() {
 		resourceTtl.GaugeSet(j.Prometheus.MetricTtlRoleAssignments)
 	}
+}
+
+func (j *Janitor) isRoleAssignmentCleanupAllowed(roleAssignment *armauthorization.RoleAssignment) bool {
+	roleDefinitionID := to.StringLower(roleAssignment.Properties.RoleDefinitionID)
+	for _, check := range j.Conf.Janitor.RoleAssignments.RoleDefintionIds {
+		// sanity check, do not allow empty IDs
+		if len(check) == 0 {
+			continue
+		}
+		check = strings.ToLower(check)
+		if strings.EqualFold(roleDefinitionID, check) || strings.HasSuffix(roleDefinitionID, check) {
+			return true
+		}
+	}
+
+	return false
 }

@@ -2,6 +2,7 @@ package janitor
 
 import (
 	"context"
+	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions"
@@ -37,10 +38,10 @@ func (j *Janitor) runResourceGroups(ctx context.Context, logger *zap.SugaredLogg
 
 				if resourceExpiryTime != nil {
 					labels := prometheus.Labels{
-						"subscriptionID": stringPtrToStringLower(subscription.SubscriptionID),
-						"resourceID":     stringPtrToStringLower(resourceGroup.ID),
-						"resourceGroup":  stringPtrToStringLower(resourceGroup.Name),
-						"resourceType":   stringToStringLower(resourceType),
+						"subscriptionID": to.StringLower(subscription.SubscriptionID),
+						"resourceID":     to.StringLower(resourceGroup.ID),
+						"resourceGroup":  to.StringLower(resourceGroup.Name),
+						"resourceType":   strings.ToLower(resourceType),
 					}
 					labels = j.Azure.ResourceTagManager.AddResourceTagsToPrometheusLabels(ctx, labels, *resourceGroup.ID)
 					resourceTtl.AddTime(labels, *resourceExpiryTime)
@@ -60,8 +61,8 @@ func (j *Janitor) runResourceGroups(ctx context.Context, logger *zap.SugaredLogg
 						resourceLogger.Error(err.Error())
 
 						j.Prometheus.MetricErrors.With(prometheus.Labels{
-							"subscriptionID": stringPtrToStringLower(subscription.SubscriptionID),
-							"resourceType":   stringToStringLower(resourceType),
+							"subscriptionID": to.StringLower(subscription.SubscriptionID),
+							"resourceType":   strings.ToLower(resourceType),
 						}).Inc()
 					}
 				}
@@ -73,16 +74,16 @@ func (j *Janitor) runResourceGroups(ctx context.Context, logger *zap.SugaredLogg
 						resourceLogger.Infof("successfully deleted")
 
 						j.Prometheus.MetricDeletedResource.With(prometheus.Labels{
-							"subscriptionID": stringPtrToStringLower(subscription.SubscriptionID),
-							"resourceType":   stringToStringLower(resourceType),
+							"subscriptionID": to.StringLower(subscription.SubscriptionID),
+							"resourceType":   strings.ToLower(resourceType),
 						}).Inc()
 					} else {
 						// failed delete
 						resourceLogger.Error(err.Error())
 
 						j.Prometheus.MetricErrors.With(prometheus.Labels{
-							"subscriptionID": stringPtrToStringLower(subscription.SubscriptionID),
-							"resourceType":   stringToStringLower(resourceType),
+							"subscriptionID": to.StringLower(subscription.SubscriptionID),
+							"resourceType":   strings.ToLower(resourceType),
 						}).Inc()
 					}
 				}

@@ -105,7 +105,7 @@ func initArgparser() {
 
 	if Opts.Janitor.RoleAssignments.Enable {
 		if len(Opts.Janitor.RoleAssignments.RoleDefintionIds) == 0 {
-			logger.Panic("roleAssignment janitor active but no roleDefinitionIds defined")
+			logger.Fatal("roleAssignment janitor active but no roleDefinitionIds defined")
 		}
 	}
 
@@ -115,11 +115,18 @@ func initArgparser() {
 	}
 
 	if !Opts.Janitor.ResourceGroups.Enable && !Opts.Janitor.Resources.Enable && !Opts.Janitor.Deployments.Enable && !Opts.Janitor.RoleAssignments.Enable {
-		logger.Fatal("no janitor task (resources, resourcegroups, deployments, roleassignments) enabled, not starting")
+		logger.Fatal(`no janitor task (resources, resourcegroups, deployments, roleassignments) enabled, not starting`)
 	}
 
 	if Opts.Janitor.RoleAssignments.DescriptionTtl != nil {
 		Opts.Janitor.RoleAssignments.DescriptionTtlRegExp = regexp.MustCompile(*Opts.Janitor.RoleAssignments.DescriptionTtl)
+	}
+
+	for _, val := range Opts.Janitor.RoleAssignments.RoleDefintionIds {
+		val = strings.ToLower(val)
+		if !strings.Contains(val, "/providers/microsoft.authorization/roledefinitions/") {
+			logger.Fatal(`roleAssignment roleDefinition IDs MUST contain "/providers/Microsoft.Authorization/" for security reasons`)
+		}
 	}
 
 	checkForDeprecations()

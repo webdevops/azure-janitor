@@ -2,6 +2,7 @@ package janitor
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources"
@@ -66,16 +67,16 @@ func (j *Janitor) runDeployments(ctx context.Context, logger *zap.SugaredLogger,
 					contextLogger.Infof("%s: successfully deleted", to.String(deployment.ID))
 
 					j.Prometheus.MetricDeletedResource.With(prometheus.Labels{
-						"subscriptionID": stringPtrToStringLower(subscription.SubscriptionID),
-						"resourceType":   stringToStringLower(resourceType),
+						"subscriptionID": to.StringLower(subscription.SubscriptionID),
+						"resourceType":   strings.ToLower(resourceType),
 					}).Inc()
 				} else {
 					// failed delete
 					contextLogger.Errorf("%s: ERROR %s", to.String(deployment.ID), err.Error())
 
 					j.Prometheus.MetricErrors.With(prometheus.Labels{
-						"subscriptionID": stringPtrToStringLower(subscription.SubscriptionID),
-						"resourceType":   stringToStringLower(resourceType),
+						"subscriptionID": to.StringLower(subscription.SubscriptionID),
+						"resourceType":   strings.ToLower(resourceType),
 					}).Inc()
 				}
 			} else {
@@ -138,16 +139,16 @@ func (j *Janitor) runDeployments(ctx context.Context, logger *zap.SugaredLogger,
 							resourceLogger.Infof("%s: successfully deleted", to.String(deployment.ID))
 
 							j.Prometheus.MetricDeletedResource.With(prometheus.Labels{
-								"subscriptionID": stringPtrToStringLower(subscription.SubscriptionID),
-								"resourceType":   stringToStringLower(resourceType),
+								"subscriptionID": to.StringLower(subscription.SubscriptionID),
+								"resourceType":   strings.ToLower(resourceType),
 							}).Inc()
 						} else {
 							// failed delete
 							resourceLogger.Errorf("%s: ERROR %s", to.String(deployment.ID), err.Error())
 
 							j.Prometheus.MetricErrors.With(prometheus.Labels{
-								"subscriptionID": stringPtrToStringLower(subscription.SubscriptionID),
-								"resourceType":   stringToStringLower(resourceType),
+								"subscriptionID": to.StringLower(subscription.SubscriptionID),
+								"resourceType":   strings.ToLower(resourceType),
 							}).Inc()
 						}
 					} else {

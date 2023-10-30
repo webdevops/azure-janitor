@@ -2,6 +2,7 @@ package janitor
 
 import (
 	"context"
+	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions"
@@ -43,8 +44,8 @@ func (j *Janitor) runResources(ctx context.Context, logger *zap.SugaredLogger, s
 				resourceLogger.Errorf("unable to detect apiVersion for Azure resource, cannot delete resource (please report this issue as bug)")
 
 				j.Prometheus.MetricErrors.With(prometheus.Labels{
-					"subscriptionID": stringPtrToStringLower(subscription.SubscriptionID),
-					"resourceType":   stringToStringLower(resourceType),
+					"subscriptionID": to.StringLower(subscription.SubscriptionID),
+					"resourceType":   strings.ToLower(resourceType),
 				}).Inc()
 
 				continue
@@ -57,8 +58,8 @@ func (j *Janitor) runResources(ctx context.Context, logger *zap.SugaredLogger, s
 
 				if resourceExpiryTime != nil {
 					labels := prometheus.Labels{
-						"subscriptionID": stringPtrToStringLower(subscription.SubscriptionID),
-						"resourceID":     stringPtrToStringLower(resource.ID),
+						"subscriptionID": to.StringLower(subscription.SubscriptionID),
+						"resourceID":     to.StringLower(resource.ID),
 						"resourceGroup":  azureResource.ResourceGroup,
 						"resourceType":   azureResource.ResourceType,
 					}
