@@ -1,7 +1,7 @@
 #############################################
 # Build
 #############################################
-FROM --platform=$BUILDPLATFORM golang:1.20-alpine as build
+FROM --platform=$BUILDPLATFORM golang:1.21-alpine as build
 
 RUN apk upgrade --no-cache --force
 RUN apk add --update build-base make git
@@ -28,9 +28,9 @@ COPY --from=build /go/src/github.com/webdevops/azure-janitor/azure-janitor .
 RUN ["./azure-janitor", "--help"]
 
 #############################################
-# Final
+# static-final
 #############################################
-FROM gcr.io/distroless/static
+FROM gcr.io/distroless/static as static-final
 ENV LOG_JSON=1
 WORKDIR /
 COPY --from=test /app .
