@@ -30,7 +30,7 @@ RUN ["./azure-janitor", "--help"]
 #############################################
 # static-final
 #############################################
-FROM gcr.io/distroless/static as static-final
+FROM gcr.io/distroless/static as final-static
 ENV LOG_JSON=1
 WORKDIR /
 COPY --from=test /app .
