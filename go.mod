@@ -13,7 +13,7 @@ require (
 	github.com/rickb777/date v1.20.5
 	github.com/webdevops/go-common v0.0.0-20231212211339-afe7e1672aa1
 	go.uber.org/zap v1.26.0
-	golang.org/x/crypto v0.16.0 // indirect
+	golang.org/x/crypto v0.17.0 // indirect
 )
 
 require (
