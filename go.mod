@@ -12,7 +12,7 @@ require (
 	github.com/karrick/tparse/v2 v2.8.2
 	github.com/prometheus/client_golang v1.18.0
 	github.com/prometheus/common v0.47.0 // indirect
-	github.com/rickb777/date v1.20.5
+	github.com/rickb777/date v1.20.6
 	github.com/webdevops/go-common v0.0.0-20240217103834-271a75e4e59c
 	go.uber.org/zap v1.26.0
 	golang.org/x/crypto v0.19.0 // indirect
