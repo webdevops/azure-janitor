@@ -14,7 +14,7 @@ require (
 	github.com/prometheus/common v0.47.0 // indirect
 	github.com/rickb777/date v1.20.5
 	github.com/webdevops/go-common v0.0.0-20240217103834-271a75e4e59c
-	go.uber.org/zap v1.26.0
+	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.19.0 // indirect
 )
 
