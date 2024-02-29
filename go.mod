@@ -10,12 +10,12 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions v1.3.0
 	github.com/jessevdk/go-flags v1.5.0
 	github.com/karrick/tparse/v2 v2.8.2
-	github.com/prometheus/client_golang v1.18.0
-	github.com/prometheus/common v0.47.0 // indirect
-	github.com/rickb777/date v1.20.5
-	github.com/webdevops/go-common v0.0.0-20240217103834-271a75e4e59c
-	go.uber.org/zap v1.26.0
-	golang.org/x/crypto v0.19.0 // indirect
+	github.com/prometheus/client_golang v1.19.0
+	github.com/prometheus/common v0.49.0 // indirect
+	github.com/rickb777/date v1.20.6
+	github.com/webdevops/go-common v0.0.0-20240229220036-40910d2ba23e
+	go.uber.org/zap v1.27.0
+	golang.org/x/crypto v0.20.0 // indirect
 )
 
 require (
@@ -23,7 +23,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.5.1 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.5.2 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resourcegraph/armresourcegraph v0.9.0 // indirect
-	github.com/AzureAD/microsoft-authentication-library-for-go v1.2.1 // indirect
+	github.com/AzureAD/microsoft-authentication-library-for-go v1.2.2 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/go-logr/logr v1.4.1 // indirect
