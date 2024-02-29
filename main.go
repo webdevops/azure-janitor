@@ -46,17 +46,19 @@ func main() {
 	initAzureConnection()
 
 	logger.Infof("init Janitor")
-	j := janitor.Janitor{
-		Conf:      Opts,
-		UserAgent: UserAgent + gitTag,
-		Logger:    logger,
-		Azure: janitor.JanitorAzureConfig{
-			Client:       AzureClient,
-			Subscription: Opts.Azure.Subscription,
-		},
-	}
-	j.Init()
-	j.Run()
+	go func() {
+		j := janitor.Janitor{
+			Conf:      Opts,
+			UserAgent: UserAgent + gitTag,
+			Logger:    logger,
+			Azure: janitor.JanitorAzureConfig{
+				Client:       AzureClient,
+				Subscription: Opts.Azure.Subscription,
+			},
+		}
+		j.Init()
+		j.Run()
+	}()
 
 	logger.Infof("starting http server on %s", Opts.Server.Bind)
 	startHttpServer()

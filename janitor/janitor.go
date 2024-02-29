@@ -79,7 +79,7 @@ func (j *Janitor) Init() {
 	j.Azure.SubscriptionsIterator = armclient.NewSubscriptionIterator(j.Azure.Client, j.Conf.Azure.Subscription...)
 
 	j.initPrometheus()
-	j.initAuzreApiVersions()
+	j.initAzureApiVersions()
 }
 
 func (j *Janitor) Run() {
@@ -151,13 +151,15 @@ func (j *Janitor) Run() {
 	}()
 }
 
-func (j *Janitor) initAuzreApiVersions() {
+func (j *Janitor) initAzureApiVersions() {
 	ctx := context.Background()
 
 	j.apiVersionMap = map[string]map[string]string{}
 
 	err := j.Azure.SubscriptionsIterator.ForEach(j.Logger, func(subscription *armsubscriptions.Subscription, logger *zap.SugaredLogger) {
 		subscriptionId := to.String(subscription.SubscriptionID)
+
+		j.Logger.With(zap.String("subscriptionID", subscriptionId)).Infof(`fetch Azure available api-versions`)
 
 		// fetch location translation map
 		subscriptionClient, err := armsubscriptions.NewClient(j.Azure.Client.GetCred(), j.Azure.Client.NewArmClientOptions())
