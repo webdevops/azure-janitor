@@ -38,6 +38,7 @@ var (
 
 func main() {
 	initArgparser()
+	initSystem()
 
 	logger.Infof("starting azure-janitor v%s (%s; %s; by %v)", gitTag, gitCommit, runtime.Version(), Author)
 	logger.Info(string(Opts.GetJson()))
