@@ -8,7 +8,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions v1.3.0
 	github.com/jessevdk/go-flags v1.6.1
 	github.com/karrick/tparse/v2 v2.8.2
-	github.com/prometheus/client_golang v1.20.3
+	github.com/prometheus/client_golang v1.20.5
 	github.com/prometheus/common v0.59.1 // indirect
 	github.com/rickb777/date v1.21.1
 	github.com/webdevops/go-common v0.0.0-20240821190643-248b039cf4c0
