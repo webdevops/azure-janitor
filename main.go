@@ -87,7 +87,7 @@ func initArgparser() {
 	// resourceGroup filter
 	Opts.Janitor.ResourceGroups.Filter = fmt.Sprintf(
 		"tagName eq '%s'",
-		strings.Replace(Opts.Janitor.Tag, "'", "\\'", -1),
+		strings.ReplaceAll(Opts.Janitor.Tag, "'", "\\'"),
 	)
 
 	// ResourceGroups: add additional filter
