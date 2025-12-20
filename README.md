@@ -20,41 +20,37 @@ Usage:
   azure-janitor [OPTIONS]
 
 Application Options:
-      --dry-run                                   Dry run (no delete) [$DRYRUN]
-      --log.debug                                 debug mode [$LOG_DEBUG]
-      --log.devel                                 development mode [$LOG_DEVEL]
-      --log.json                                  Switch log output to json format [$LOG_JSON]
-      --azure.environment=                        Azure environment name (default: AZUREPUBLICCLOUD) [$AZURE_ENVIRONMENT]
-      --azure.subscription=                       Azure subscription ID (space delimiter) [$AZURE_SUBSCRIPTION_ID]
-      --azure.resource-tag=                       Azure Resource tags (space delimiter) (default: owner) [$AZURE_RESOURCE_TAG]
-      --janitor.interval=                         Janitor interval (time.duration) (default: 1h) [$JANITOR_INTERVAL]
-      --janitor.tag=                              Janitor azure tag (string) (default: ttl) [$JANITOR_TAG]
-      --janitor.tag.target=                       Janitor azure tag (string) (default: ttl_expiry) [$JANITOR_TAG_TARGET]
-      --janitor.resourcegroups                    Enable Azure ResourceGroups cleanup [$JANITOR_RESOURCEGROUPS_ENABLE]
-      --janitor.resourcegroups.filter=            Additional $filter for Azure REST API for ResourceGroups [$JANITOR_RESOURCEGROUPS_FILTER]
-      --janitor.resources                         Enable Azure Resources cleanup [$JANITOR_RESOURCES_ENABLE]
-      --janitor.resources.filter=                 Additional $filter for Azure REST API for Resources [$JANITOR_RESOURCES_FILTER]
-      --janitor.deployments                       Enable Azure Deployments cleanup [$JANITOR_DEPLOYMENTS_ENABLE]
-      --janitor.deployments.ttl=                  Janitor deployment ttl (time.duration) (default: 8760h) [$JANITOR_DEPLOYMENTS_TTL]
-      --janitor.deployments.limit=                Janitor deployment limit count (int) (default: 700) [$JANITOR_DEPLOYMENTS_LIMIT]
-      --janitor.roleassignments                   Enable Azure RoleAssignments cleanup [$JANITOR_ROLEASSIGNMENTS_ENABLE]
-      --janitor.roleassignments.ttl=              Janitor roleassignment ttl (time.duration) (default: 6h) [$JANITOR_ROLEASSIGNMENTS_TTL]
-      --janitor.roleassignments.roledefinitionid= Janitor roledefinition ID (eg:
-                                                  /subscriptions/xxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx/providers/Microsoft.Authorization/roleDef-
-                                                  initions/xxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx or
-                                                  /providers/Microsoft.Authorization/roleDefinitions/xxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx for
-                                                  subscription independent roleDefinitions)  (space delimiter)
-                                                  [$JANITOR_ROLEASSIGNMENTS_ROLEDEFINITIONID]
-      --janitor.roleassignments.filter=           Additional $filter for Azure REST API for RoleAssignments
-                                                  [$JANITOR_ROLEASSIGNMENTS_FILTER]
-      --janitor.roleassignments.descriptionttl=   Regexp for detecting ttl inside description of RoleAssignment
-                                                  [$JANITOR_ROLEASSIGNMENTS_DESCRIPTIONTTL]
-      --server.bind=                              Server address (default: :8080) [$SERVER_BIND]
-      --server.timeout.read=                      Server read timeout (default: 5s) [$SERVER_TIMEOUT_READ]
-      --server.timeout.write=                     Server write timeout (default: 10s) [$SERVER_TIMEOUT_WRITE]
+      --dry-run                                    Dry run (no delete) [$DRYRUN]
+      --log.level=[trace|debug|info|warning|error] Log level (default: info) [$LOG_LEVEL]
+      --log.format=[logfmt|json]                   Log format (default: logfmt) [$LOG_FORMAT]
+      --log.source=[|short|file|full]              Show source for every log message (useful for debugging and bug reports) [$LOG_SOURCE]
+      --log.color=[|auto|yes|no]                   Enable color for logs [$LOG_COLOR]
+      --log.time                                   Show log time [$LOG_TIME]
+      --azure.environment=                         Azure environment name (default: AZUREPUBLICCLOUD) [$AZURE_ENVIRONMENT]
+      --azure.subscription=                        Azure subscription ID (space delimiter) [$AZURE_SUBSCRIPTION_ID]
+      --azure.resource-tag=                        Azure Resource tags (space delimiter) (default: owner) [$AZURE_RESOURCE_TAG]
+      --janitor.interval=                          Janitor interval (time.duration) (default: 1h) [$JANITOR_INTERVAL]
+      --janitor.tag=                               Janitor azure tag (string) (default: ttl) [$JANITOR_TAG]
+      --janitor.tag.target=                        Janitor azure tag (string) (default: ttl_expiry) [$JANITOR_TAG_TARGET]
+      --janitor.resourcegroups                     Enable Azure ResourceGroups cleanup [$JANITOR_RESOURCEGROUPS_ENABLE]
+      --janitor.resourcegroups.filter=             Additional $filter for Azure REST API for ResourceGroups [$JANITOR_RESOURCEGROUPS_FILTER]
+      --janitor.resources                          Enable Azure Resources cleanup [$JANITOR_RESOURCES_ENABLE]
+      --janitor.resources.filter=                  Additional $filter for Azure REST API for Resources [$JANITOR_RESOURCES_FILTER]
+      --janitor.deployments                        Enable Azure Deployments cleanup [$JANITOR_DEPLOYMENTS_ENABLE]
+      --janitor.deployments.ttl=                   Janitor deployment ttl (time.duration) (default: 8760h) [$JANITOR_DEPLOYMENTS_TTL]
+      --janitor.deployments.limit=                 Janitor deployment limit count (int) (default: 700) [$JANITOR_DEPLOYMENTS_LIMIT]
+      --janitor.roleassignments                    Enable Azure RoleAssignments cleanup [$JANITOR_ROLEASSIGNMENTS_ENABLE]
+      --janitor.roleassignments.ttl=               Janitor roleassignment ttl (time.duration) (default: 6h) [$JANITOR_ROLEASSIGNMENTS_TTL]
+      --janitor.roleassignments.roledefinitionid=  Janitor roledefinition ID (eg: /subscriptions/xxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx/providers/Microsoft.Authorization/roleDefinitions/xxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx or
+                                                   /providers/Microsoft.Authorization/roleDefinitions/xxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx for subscription independent roleDefinitions)  (space delimiter) [$JANITOR_ROLEASSIGNMENTS_ROLEDEFINITIONID]
+      --janitor.roleassignments.filter=            Additional $filter for Azure REST API for RoleAssignments [$JANITOR_ROLEASSIGNMENTS_FILTER]
+      --janitor.roleassignments.descriptionttl=    Regexp for detecting ttl inside description of RoleAssignment [$JANITOR_ROLEASSIGNMENTS_DESCRIPTIONTTL]
+      --server.bind=                               Server address (default: :8080) [$SERVER_BIND]
+      --server.timeout.read=                       Server read timeout (default: 5s) [$SERVER_TIMEOUT_READ]
+      --server.timeout.write=                      Server write timeout (default: 10s) [$SERVER_TIMEOUT_WRITE]
 
 Help Options:
-  -h, --help                                      Show this help message
+  -h, --help                                       Show this help message
 ```
 
 for Azure API authentication (using ENV vars)
