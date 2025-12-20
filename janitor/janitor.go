@@ -319,15 +319,17 @@ func (j *Janitor) checkAzureResourceExpiry(logger *zap.SugaredLogger, resourceTy
 
 func (j *Janitor) getTtlTagFromAzureResource(tags map[string]*string) *string {
 	// check target tag first
+	janitorTagTarget := strings.ToLower(j.Conf.Janitor.TagTarget)
 	for tagName, tagValue := range tags {
-		if tagName == j.Conf.Janitor.TagTarget && tagValue != nil && *tagValue != "" {
+		if strings.ToLower(tagName) == janitorTagTarget && tagValue != nil && *tagValue != "" {
 			return tagValue
 		}
 	}
 
 	// check source tag last
+	janitorTag := strings.ToLower(j.Conf.Janitor.Tag)
 	for tagName, tagValue := range tags {
-		if tagName == j.Conf.Janitor.Tag && tagValue != nil && *tagValue != "" {
+		if strings.ToLower(tagName) == janitorTag && tagValue != nil && *tagValue != "" {
 			return tagValue
 		}
 	}
