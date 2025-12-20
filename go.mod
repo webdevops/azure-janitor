@@ -1,6 +1,6 @@
 module github.com/webdevops/azure-janitor
 
-go 1.25
+go 1.25.0
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2 v2.2.0
