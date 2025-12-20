@@ -12,10 +12,11 @@ require (
 	github.com/karrick/tparse/v2 v2.8.2
 	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/common v0.67.4 // indirect
-	github.com/rickb777/date v1.22.0
 	github.com/webdevops/go-common v0.0.0-20251219213826-139615203ee5
 	golang.org/x/crypto v0.46.0 // indirect
 )
+
+require github.com/rickb777/period v1.0.21
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.20.0 // indirect
@@ -30,6 +31,7 @@ require (
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
+	github.com/govalues/decimal v0.1.36 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/lmittmann/tint v1.1.2 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect

@@ -11,7 +11,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions"
 	tparse "github.com/karrick/tparse/v2"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/rickb777/date/period"
+	"github.com/rickb777/period"
 	"github.com/webdevops/go-common/azuresdk/armclient"
 	"github.com/webdevops/go-common/log/slogger"
 	"github.com/webdevops/go-common/utils/to"
