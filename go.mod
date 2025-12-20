@@ -2,6 +2,8 @@ module github.com/webdevops/azure-janitor
 
 go 1.25.0
 
+toolchain go1.25.5
+
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2 v2.2.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources v1.2.0
