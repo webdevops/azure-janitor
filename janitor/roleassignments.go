@@ -2,6 +2,7 @@ package janitor
 
 import (
 	"context"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -9,27 +10,27 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/webdevops/go-common/azuresdk/armclient"
+	"github.com/webdevops/go-common/log/slogger"
 	prometheusCommon "github.com/webdevops/go-common/prometheus"
 	"github.com/webdevops/go-common/utils/to"
-	"go.uber.org/zap"
 )
 
-func (j *Janitor) runRoleAssignments(ctx context.Context, logger *zap.SugaredLogger, subscription *armsubscriptions.Subscription, filter string, callback chan<- func()) {
-	contextLogger := logger.With(zap.String("task", "roleAssignment"))
+func (j *Janitor) runRoleAssignments(ctx context.Context, logger *slogger.Logger, subscription *armsubscriptions.Subscription, filter string, callback chan<- func()) {
+	contextLogger := logger.With(slog.String("task", "roleAssignment"))
 
 	resourceTtl := prometheusCommon.NewMetricsList()
 	resourceType := "Microsoft.Authorization/roleAssignments"
 
 	client, err := armauthorization.NewRoleAssignmentsClient(*subscription.SubscriptionID, j.Azure.Client.GetCred(), j.Azure.Client.NewArmClientOptions())
 	if err != nil {
-		logger.Panic(err)
+		panic(err)
 	}
 
 	pager := client.NewListForScopePager(*subscription.ID, nil)
 	for pager.More() {
 		result, err := pager.NextPage(ctx)
 		if err != nil {
-			logger.Panic(err)
+			panic(err)
 		}
 
 		for _, roleAssignment := range result.Value {
@@ -40,13 +41,13 @@ func (j *Janitor) runRoleAssignments(ctx context.Context, logger *zap.SugaredLog
 			azureResource, _ := armclient.ParseResourceId(*roleAssignment.Properties.Scope)
 
 			roleAssignmentLogger := contextLogger.With(
-				zap.String("roleAssignmentId", to.StringLower(roleAssignment.ID)),
-				zap.String("scope", to.StringLower(roleAssignment.Properties.Scope)),
-				zap.String("principalId", to.StringLower(roleAssignment.Properties.PrincipalID)),
-				zap.String("principalType", strings.ToLower(string(*roleAssignment.Properties.PrincipalType))),
-				zap.String("roleDefinitionId", to.StringLower(roleAssignment.Properties.RoleDefinitionID)),
-				zap.String("subscriptionID", to.StringLower(subscription.SubscriptionID)),
-				zap.String("resourceGroup", azureResource.ResourceGroup),
+				slog.String("roleAssignmentId", to.StringLower(roleAssignment.ID)),
+				slog.String("scope", to.StringLower(roleAssignment.Properties.Scope)),
+				slog.String("principalId", to.StringLower(roleAssignment.Properties.PrincipalID)),
+				slog.String("principalType", strings.ToLower(string(*roleAssignment.Properties.PrincipalType))),
+				slog.String("roleDefinitionId", to.StringLower(roleAssignment.Properties.RoleDefinitionID)),
+				slog.String("subscriptionID", to.StringLower(subscription.SubscriptionID)),
+				slog.String("resourceGroup", azureResource.ResourceGroup),
 			)
 
 			// check if roleAssignment is allowed for cleanup

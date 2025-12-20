@@ -3,6 +3,7 @@ package janitor
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -12,8 +13,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rickb777/date/period"
 	"github.com/webdevops/go-common/azuresdk/armclient"
+	"github.com/webdevops/go-common/log/slogger"
 	"github.com/webdevops/go-common/utils/to"
-	"go.uber.org/zap"
 
 	"github.com/webdevops/azure-janitor/config"
 )
@@ -29,7 +30,7 @@ type (
 		Conf  config.Opts
 		Azure JanitorAzureConfig
 
-		Logger *zap.SugaredLogger
+		Logger *slogger.Logger
 
 		UserAgent string
 
@@ -96,10 +97,10 @@ func (j *Janitor) Run() {
 
 			// subscription processing
 			go func() {
-				err := j.Azure.SubscriptionsIterator.ForEach(runLogger, func(subscription *armsubscriptions.Subscription, logger *zap.SugaredLogger) {
+				err := j.Azure.SubscriptionsIterator.ForEach(runLogger.Logger, func(subscription *armsubscriptions.Subscription, logger *slog.Logger) {
 					contextLogger := runLogger.With(
-						zap.String("subscriptionID", to.String(subscription.SubscriptionID)),
-						zap.String("subscriptionName", to.String(subscription.DisplayName)),
+						slog.String("subscriptionID", to.String(subscription.SubscriptionID)),
+						slog.String("subscriptionName", to.String(subscription.DisplayName)),
 					)
 
 					if j.Conf.Janitor.Deployments.Enable {
@@ -119,7 +120,7 @@ func (j *Janitor) Run() {
 					}
 				})
 				if err != nil {
-					runLogger.Panic(err)
+					panic(err)
 				}
 
 				close(callbackFuncs)
@@ -145,7 +146,10 @@ func (j *Janitor) Run() {
 			duration := time.Since(startTime)
 			j.Prometheus.MetricDuration.With(prometheus.Labels{}).Set(duration.Seconds())
 
-			runLogger.With(zap.Float64("duration", duration.Seconds())).Infof("finished run in %s, waiting %s", duration.String(), j.Conf.Janitor.Interval.String())
+			runLogger.With(
+				slog.Duration("duration", duration),
+				slog.Time("nextRun", time.Now().Add(j.Conf.Janitor.Interval)),
+			).Info("finished run")
 			time.Sleep(j.Conf.Janitor.Interval)
 		}
 	}()
@@ -156,15 +160,15 @@ func (j *Janitor) initAzureApiVersions() {
 
 	j.apiVersionMap = map[string]map[string]string{}
 
-	err := j.Azure.SubscriptionsIterator.ForEach(j.Logger, func(subscription *armsubscriptions.Subscription, logger *zap.SugaredLogger) {
+	err := j.Azure.SubscriptionsIterator.ForEach(j.Logger.Slog(), func(subscription *armsubscriptions.Subscription, logger *slog.Logger) {
 		subscriptionId := to.String(subscription.SubscriptionID)
 
-		j.Logger.With(zap.String("subscriptionID", subscriptionId)).Infof(`fetch Azure available api-versions`)
+		j.Logger.With(slog.String("subscriptionID", subscriptionId)).Infof(`fetch Azure available api-versions`)
 
 		// fetch location translation map
 		subscriptionClient, err := armsubscriptions.NewClient(j.Azure.Client.GetCred(), j.Azure.Client.NewArmClientOptions())
 		if err != nil {
-			logger.Panic(err)
+			panic(err)
 		}
 
 		locationPager := subscriptionClient.NewListLocationsPager(*subscription.SubscriptionID, nil)
@@ -172,7 +176,7 @@ func (j *Janitor) initAzureApiVersions() {
 		for locationPager.More() {
 			result, err := locationPager.NextPage(ctx)
 			if err != nil {
-				logger.Panic(err)
+				panic(err)
 			}
 
 			for _, location := range result.Value {
@@ -184,7 +188,7 @@ func (j *Janitor) initAzureApiVersions() {
 
 		providersClient, err := armresources.NewProvidersClient(*subscription.SubscriptionID, j.Azure.Client.GetCred(), j.Azure.Client.NewArmClientOptions())
 		if err != nil {
-			logger.Panic(err)
+			panic(err)
 		}
 
 		providerPager := providersClient.NewListPager(nil)
@@ -192,7 +196,7 @@ func (j *Janitor) initAzureApiVersions() {
 		for providerPager.More() {
 			result, err := providerPager.NextPage(ctx)
 			if err != nil {
-				logger.Panic(err)
+				panic(err)
 			}
 
 			for _, provider := range result.Value {
@@ -264,7 +268,7 @@ func (j *Janitor) initAzureApiVersions() {
 		}
 	})
 	if err != nil {
-		j.Logger.Panic(err)
+		panic(err)
 	}
 }
 
@@ -281,7 +285,7 @@ func (j *Janitor) getAzureApiVersionForResourceType(subscriptionId, location, re
 	return
 }
 
-func (j *Janitor) checkAzureResourceExpiry(logger *zap.SugaredLogger, resourceType, resourceId string, resourceTags *map[string]*string) (resourceExpireTime *time.Time, resourceExpired bool, resourceTagRewriteNeeded bool) {
+func (j *Janitor) checkAzureResourceExpiry(logger *slogger.Logger, resourceType, resourceId string, resourceTags *map[string]*string) (resourceExpireTime *time.Time, resourceExpired bool, resourceTagRewriteNeeded bool) {
 	ttlValue := j.getTtlTagFromAzureResource(*resourceTags)
 
 	if ttlValue != nil {

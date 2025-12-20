@@ -2,31 +2,32 @@ package janitor
 
 import (
 	"context"
+	"log/slog"
 	"strings"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/webdevops/go-common/log/slogger"
 	prometheusCommon "github.com/webdevops/go-common/prometheus"
 	"github.com/webdevops/go-common/utils/to"
-	"go.uber.org/zap"
 )
 
-func (j *Janitor) runDeployments(ctx context.Context, logger *zap.SugaredLogger, subscription *armsubscriptions.Subscription, callback chan<- func()) {
+func (j *Janitor) runDeployments(ctx context.Context, logger *slogger.Logger, subscription *armsubscriptions.Subscription, callback chan<- func()) {
 	var deploymentCounter, deploymentFinalCounter int64
-	contextLogger := logger.With(zap.String("task", "deployment"))
+	contextLogger := logger.With(slog.String("task", "deployment"))
 
 	client, err := armresources.NewResourceGroupsClient(*subscription.SubscriptionID, j.Azure.Client.GetCred(), j.Azure.Client.NewArmClientOptions())
 	if err != nil {
-		logger.Panic(err)
+		panic(err)
 	}
 
 	deploymentMetric := prometheusCommon.NewMetricsList()
 
 	deploymentClient, err := armresources.NewDeploymentsClient(*subscription.SubscriptionID, j.Azure.Client.GetCred(), j.Azure.Client.NewArmClientOptions())
 	if err != nil {
-		logger.Panic(err)
+		panic(err)
 	}
 
 	resourceType := "Microsoft.Resources/deployments"
@@ -35,7 +36,7 @@ func (j *Janitor) runDeployments(ctx context.Context, logger *zap.SugaredLogger,
 	// Subscription deployments
 	deploymentPager := deploymentClient.NewListAtSubscriptionScopePager(nil)
 	if err != nil {
-		logger.Panic(err)
+		panic(err)
 	}
 
 	deploymentCounter = 0
@@ -43,7 +44,7 @@ func (j *Janitor) runDeployments(ctx context.Context, logger *zap.SugaredLogger,
 	for deploymentPager.More() {
 		deploymentResult, err := deploymentPager.NextPage(ctx)
 		if err != nil {
-			logger.Panic(err)
+			panic(err)
 		}
 
 		for _, deployment := range deploymentResult.Value {
@@ -98,24 +99,24 @@ func (j *Janitor) runDeployments(ctx context.Context, logger *zap.SugaredLogger,
 	for resourceGroupPager.More() {
 		resourceGroupResult, err := resourceGroupPager.NextPage(ctx)
 		if err != nil {
-			logger.Panic(err)
+			panic(err)
 		}
 
 		for _, resourceGroup := range resourceGroupResult.Value {
 			deploymentCounter = 0
 			deploymentFinalCounter = 0
 
-			resourceLogger := contextLogger.With(zap.String("resource", to.String(resourceGroup.ID)))
+			resourceLogger := contextLogger.With(slog.String("resource", to.String(resourceGroup.ID)))
 
 			deploymentPager := deploymentClient.NewListByResourceGroupPager(*resourceGroup.Name, nil)
 			if err != nil {
-				logger.Panic(err)
+				panic(err)
 			}
 
 			for deploymentPager.More() {
 				deploymentResult, err := deploymentPager.NextPage(ctx)
 				if err != nil {
-					logger.Panic(err)
+					panic(err)
 				}
 
 				for _, deployment := range deploymentResult.Value {

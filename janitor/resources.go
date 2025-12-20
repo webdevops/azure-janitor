@@ -2,23 +2,24 @@ package janitor
 
 import (
 	"context"
+	"log/slog"
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/webdevops/go-common/azuresdk/armclient"
+	"github.com/webdevops/go-common/log/slogger"
 	prometheusCommon "github.com/webdevops/go-common/prometheus"
 	"github.com/webdevops/go-common/utils/to"
-	"go.uber.org/zap"
 )
 
-func (j *Janitor) runResources(ctx context.Context, logger *zap.SugaredLogger, subscription *armsubscriptions.Subscription, filter string, callback chan<- func()) {
-	contextLogger := logger.With(zap.String("task", "resource"))
+func (j *Janitor) runResources(ctx context.Context, logger *slogger.Logger, subscription *armsubscriptions.Subscription, filter string, callback chan<- func()) {
+	contextLogger := logger.With(slog.String("task", "resource"))
 
 	client, err := armresources.NewClient(*subscription.SubscriptionID, j.Azure.Client.GetCred(), j.Azure.Client.NewArmClientOptions())
 	if err != nil {
-		logger.Panic(err)
+		panic(err)
 	}
 
 	resourceTtl := prometheusCommon.NewMetricsList()
@@ -27,7 +28,7 @@ func (j *Janitor) runResources(ctx context.Context, logger *zap.SugaredLogger, s
 	for pager.More() {
 		result, err := pager.NextPage(ctx)
 		if err != nil {
-			logger.Panic(err)
+			panic(err)
 		}
 
 		for _, resource := range result.Value {
@@ -35,9 +36,9 @@ func (j *Janitor) runResources(ctx context.Context, logger *zap.SugaredLogger, s
 			resourceTypeApiVersion := j.getAzureApiVersionForResourceType(*subscription.SubscriptionID, to.String(resource.Location), resourceType)
 
 			resourceLogger := contextLogger.With(
-				zap.String("resource", to.String(resource.ID)),
-				zap.String("location", to.String(resource.Location)),
-				zap.String("apiVersion", resourceTypeApiVersion),
+				slog.String("resource", to.String(resource.ID)),
+				slog.String("location", to.String(resource.Location)),
+				slog.String("apiVersion", resourceTypeApiVersion),
 			)
 
 			if resourceTypeApiVersion == "" {
@@ -51,7 +52,7 @@ func (j *Janitor) runResources(ctx context.Context, logger *zap.SugaredLogger, s
 				continue
 			}
 
-			if resourceTypeApiVersion != "" && resource.Tags != nil {
+			if resource.Tags != nil {
 				resourceExpiryTime, resourceExpired, resourceTagUpdateNeeded := j.checkAzureResourceExpiry(resourceLogger, resourceType, *resource.ID, &resource.Tags)
 
 				azureResource, _ := armclient.ParseResourceId(*resource.ID)

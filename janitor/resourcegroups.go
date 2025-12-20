@@ -2,23 +2,24 @@ package janitor
 
 import (
 	"context"
+	"log/slog"
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/webdevops/go-common/log/slogger"
 	prometheusCommon "github.com/webdevops/go-common/prometheus"
 	"github.com/webdevops/go-common/utils/to"
-	"go.uber.org/zap"
 )
 
-func (j *Janitor) runResourceGroups(ctx context.Context, logger *zap.SugaredLogger, subscription *armsubscriptions.Subscription, filter string, callback chan<- func()) {
-	contextLogger := logger.With(zap.String("task", "resourceGroup"))
+func (j *Janitor) runResourceGroups(ctx context.Context, logger *slogger.Logger, subscription *armsubscriptions.Subscription, filter string, callback chan<- func()) {
+	contextLogger := logger.With(slog.String("task", "resourceGroup"))
 	resourceType := "Microsoft.Resources/resourceGroups"
 
 	client, err := armresources.NewResourceGroupsClient(*subscription.SubscriptionID, j.Azure.Client.GetCred(), j.Azure.Client.NewArmClientOptions())
 	if err != nil {
-		logger.Panic(err)
+		panic(err)
 	}
 
 	resourceTtl := prometheusCommon.NewMetricsList()
@@ -27,11 +28,11 @@ func (j *Janitor) runResourceGroups(ctx context.Context, logger *zap.SugaredLogg
 	for pager.More() {
 		result, err := pager.NextPage(ctx)
 		if err != nil {
-			logger.Panic(err)
+			panic(err)
 		}
 
 		for _, resourceGroup := range result.Value {
-			resourceLogger := contextLogger.With(zap.String("resource", to.String(resourceGroup.ID)))
+			resourceLogger := contextLogger.With(slog.String("resource", to.String(resourceGroup.ID)))
 
 			if resourceGroup.Tags != nil {
 				resourceExpiryTime, resourceExpired, resourceTagUpdateNeeded := j.checkAzureResourceExpiry(resourceLogger, resourceType, *resourceGroup.ID, &resourceGroup.Tags)

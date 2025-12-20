@@ -1,11 +1,13 @@
 package janitor
 
 import (
+	"io"
+	"log/slog"
 	"testing"
 	"time"
 
+	"github.com/webdevops/go-common/log/slogger"
 	"github.com/webdevops/go-common/utils/to"
-	"go.uber.org/zap"
 
 	"github.com/webdevops/azure-janitor/config"
 )
@@ -19,12 +21,8 @@ func buildJanitorObj() *Janitor {
 	return &j
 }
 
-func buildTestLogger() *zap.SugaredLogger {
-	loggerConfig := zap.NewDevelopmentConfig()
-	loggerConfig.OutputPaths = []string{"/dev/null"}
-	loggerConfig.ErrorOutputPaths = []string{"/dev/null"}
-	logger, _ := loggerConfig.Build()
-	return logger.Sugar()
+func buildTestLogger() *slogger.Logger {
+	return slogger.New(slog.NewTextHandler(io.Discard, nil))
 }
 
 func TestDurationParser(t *testing.T) {
