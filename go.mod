@@ -1,6 +1,6 @@
 module github.com/webdevops/azure-janitor
 
-go 1.25.0
+go 1.25
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2 v2.2.0
@@ -12,7 +12,6 @@ require (
 	github.com/prometheus/common v0.67.4 // indirect
 	github.com/rickb777/date v1.22.0
 	github.com/webdevops/go-common v0.0.0-20251219213826-139615203ee5
-	go.uber.org/zap v1.27.1
 	golang.org/x/crypto v0.46.0 // indirect
 )
 
@@ -41,7 +40,6 @@ require (
 	github.com/remeh/sizedwaitgroup v1.0.0 // indirect
 	github.com/rickb777/plural v1.4.7 // indirect
 	go.uber.org/automaxprocs v1.6.0 // indirect
-	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	golang.org/x/net v0.48.0 // indirect
 	golang.org/x/sys v0.39.0 // indirect
