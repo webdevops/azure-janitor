@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"regexp"
@@ -62,7 +63,7 @@ func main() {
 		j.Run()
 	}()
 
-	logger.Infof("starting http server on %s", Opts.Server.Bind)
+	logger.Info("starting http server", slog.String("bind", Opts.Server.Bind))
 	startHttpServer()
 }
 
