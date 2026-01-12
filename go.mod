@@ -16,7 +16,7 @@ require (
 	golang.org/x/crypto v0.46.0 // indirect
 )
 
-require github.com/rickb777/period v1.0.21
+require github.com/rickb777/period v1.0.22
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.20.0 // indirect
